@@ -1,0 +1,3 @@
+module miney
+
+writeln $ "hello"
