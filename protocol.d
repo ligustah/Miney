@@ -30,6 +30,15 @@ static void addHandler(ClassInfo ci)
 		PacketHandlers[o.packetID] = ci;
 		Stdout.formatln("adding handler for packet 0x{:x} \"{}\"", o.packetID, ci.name);
 	}
+	else
+	{
+		assert(false, "invalid handler " ~ ci.name);
+	}
+}
+
+template getter(char[] name)
+{
+	static const char[] getter = "public typeof(_" ~ name ~ ") " ~ name ~ "(){ return _" ~ name ~ ";}";
 }
 
 enum PacketID : ubyte
@@ -149,6 +158,64 @@ class MinecraftDataOutput : DataOutput
 		int16(str.length);
 		return write(str);
 	}
+	
+	public typeof(this) put(char[] str)
+	{
+		string(str);
+		
+		return this;
+	}
+	
+	public typeof(this) put(bool b)
+	{
+		putBool(b);
+		
+		return this;
+	}
+	
+	public typeof(this) put(int i)
+	{
+		putInt(i);
+		
+		return this;
+	}
+	
+	public typeof(this) put(short s)
+	{
+		putShort(s);
+		
+		return this;
+	}
+	
+	public typeof(this) put(float f)
+	{
+		putFloat(f);
+		
+		return this;
+	}
+	
+	public typeof(this) put(double d)
+	{
+		putFloat(d);
+		
+		return this;
+	}
+	
+	public typeof(this) put(byte b)
+	{
+		putByte(b);
+		
+		return this;
+	}
+	
+	public typeof(this) put(PacketID id)
+	{
+		putByte(id);
+		
+		return this;
+	}
+	
+	public alias put opOr;
 }
 
 class MinecraftDataInput : DataInput
@@ -170,6 +237,57 @@ class MinecraftDataInput : DataInput
 		
 		return str;
 	}
+	
+	public typeof(this) get(out char[] str)
+	{
+		str = string();
+		
+		return this;
+	}
+	
+	public typeof(this) get(out bool b)
+	{
+		b = getBool();
+		
+		return this;
+	}
+	
+	public typeof(this) get(out int i)
+	{
+		i = getInt();
+		
+		return this;
+	}
+	
+	public typeof(this) get(out byte b)
+	{
+		b = getByte();
+		
+		return this;
+	}
+	
+	public typeof(this) get(out short s)
+	{
+		s = getShort();
+		
+		return this;
+	}
+	
+	public typeof(this) get(out float f)
+	{
+		f = getFloat();
+		
+		return this;
+	}
+	
+	public typeof(this) get(out double d)
+	{
+		d = getDouble();
+		
+		return this;
+	}
+	
+	public alias get opOr;
 }
 
 interface Sendable
@@ -475,6 +593,130 @@ class SpawnPosition : Receivable
 	}
 }
 
+class UseEntity : Sendable, Receivable
+{
+	static this()
+	{
+		addHandler(UseEntity.classinfo);
+	}
+	
+	public size_t minSize()
+	{
+		return 10;
+	}
+	
+	public PacketID packetID()
+	{
+		return PacketID.UseEntity;
+	}
+	
+	private int _user, _target;
+	private bool _leftClick;
+	
+	public this(int user, int target, bool leftClick)
+	{
+		this._user = user;
+		this._target = target;
+		this._leftClick = leftClick;
+	}
+	
+	public this()
+	{
+	}
+	
+	public int receive(MinecraftDataInput input)
+	{
+		_user = input.getInt();
+		_target = input.getInt();
+		_leftClick = input.getBool();
+		
+		return minSize;
+	}
+	
+	public void send(MinecraftDataOutput output)
+	{
+		output.putByte(packetID);
+		output.putInt(_user);
+		output.putInt(_target);
+		output.putBool(_leftClick);
+	}
+	
+	public int user()
+	{
+		return _user;
+	}
+	
+	public int target()
+	{
+		return _target;
+	}
+	
+	public bool leftClick()
+	{
+		return _leftClick;
+	}
+}
+
+class UpdateHealth : Receivable
+{
+	static this()
+	{
+		addHandler(UpdateHealth.classinfo);
+	}
+	
+	public PacketID packetID()
+	{
+		return PacketID.UpdateHealth;
+	}
+	
+	public size_t minSize()
+	{
+		return 3;
+	}
+	
+	private short _health;
+	
+	public int receive(MinecraftDataInput input)
+	{
+		_health = input.getShort();
+		
+		return minSize;
+	}
+	
+	public short health()
+	{
+		return _health;
+	}
+}
+
+class Respawn : Sendable, Receivable
+{
+	static this()
+	{
+		addHandler(Respawn.classinfo);
+	}
+	
+	public size_t minSize()
+	{
+		return 1;
+	}
+	
+	public PacketID packetID()
+	{
+		return PacketID.Respawn;
+	}
+	
+	public int receive(MinecraftDataInput input)
+	{
+		return minSize;
+	}
+	
+	public void send(MinecraftDataOutput output)
+	{
+		output.putByte(packetID);
+	}
+}
+
 class Player : Sendable
 {	
 	private bool _onGround;
@@ -699,12 +941,13 @@ class PlayerBlockPlacement : Sendable, Receivable
 	
 	private int _x, _z;
 	private byte _y, _direction, _amount;
-	union
-	{
-		private short _block;
-		private short _itemID;
-	}
+	private short _block;
+	private alias _block _itemID;
 	private short _damage;
+	
+	public this()
+	{
+	}
 	
 	public this(int x, byte y, int z, byte direction, short blockOrItem, byte amount = 0, short damage = 0)
 	{
@@ -747,6 +990,32 @@ class PlayerBlockPlacement : Sendable, Receivable
 			output.putShort(_damage);
 		}
 	}
+	
+	public int x()
+	{
+		return _x;
+	}
+	
+	public byte y()
+	{
+		return _y;
+	}
+	
+	public int z()
+	{
+		return _z;
+	}
+	
+	public byte direction()
+	{
+		return _direction;
+	}
+	
+	public alias block itemID;
+	public byte block()
+	{
+		return _block;
+	}
 }
 
 class HoldingChange : Sendable
@@ -767,6 +1036,58 @@ class HoldingChange : Sendable
 	{
 		output.putByte(packetID);
 		output.putShort(_slotID);
+	}
+}
+
+class UseBed : Receivable
+{
+	static this()
+	{
+		addHandler(UseBed.classinfo);
+	}
+	
+	public PacketID packetID()
+	{
+		return PacketID.UseBed;
+	}
+	
+	public size_t minSize()
+	{
+		return 15;
+	}
+	
+	private int _entityID, _x, _z;
+	private byte _unknown, _y;
+	
+	public int receive(MinecraftDataInput input)
+	{
+		_entityID = input.getInt();
+		_unknown = input.getByte();
+		_x = input.getInt();
+		_y = input.getByte();
+		_z = input.getInt();
+		
+		return minSize;
+	}
+	
+	public int entityID()
+	{
+		return _entityID;
+	}
+	
+	public int x()
+	{
+		return _x;
+	}
+	
+	public byte y()
+	{
+		return _y;
+	}
+	
+	public int z()
+	{
+		return _z;
 	}
 }
 
@@ -811,9 +1132,10 @@ class Animation : Sendable, Receivable
 	
 	public void send(MinecraftDataOutput output)
 	{
-		output.putByte(packetID);
-		output.putInt(_EID);
-		output.putByte(_animate);
+		output
+		|packetID
+		|_EID
+		|_animate;
 	}
 	
 	public int EID()
@@ -824,5 +1146,56 @@ class Animation : Sendable, Receivable
 	public byte animate()
 	{
 		return _animate;
+	}
+}
+
+class EntityAction : Receivable, Sendable
+{
+	static this()
+	{
+		addHandler(EntityAction.classinfo);
+	}
+	
+	public size_t minSize()
+	{
+		return 6;
+	}
+	
+	public PacketID packetID()
+	{
+		return PacketID.EntityAction;
+	}
+	
+	private int _entityID;
+	private byte _action;
+	
+	mixin(getter!("entityID"));
+	mixin(getter!("action"));
+	
+	public this()
+	{
+	}
+	
+	public this(int entityID, byte action)
+	{
+		this._entityID = entityID;
+		this._action = action;
+	}
+	
+	public void send(MinecraftDataOutput output)
+	{
+		output
+		|packetID
+		|_entityID
+		|_action;
+	}
+	
+	public int receive(MinecraftDataInput input)
+	{
+		input
+		|_entityID
+		|_action;
+		
+		return minSize;
 	}
 }

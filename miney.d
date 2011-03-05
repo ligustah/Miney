@@ -15,8 +15,6 @@ import protocol;
 
 void main()
 {
-	//Stdout(Receivable);
-	
 	MDVM vm;
 	
 	auto t = openVM(&vm);
