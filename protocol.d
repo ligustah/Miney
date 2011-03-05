@@ -88,6 +88,26 @@ enum PacketID : ubyte
 	Disconnect = 0xFF
 }
 
+enum DiggingStatus : byte
+{
+	StartedDigging = 0x00,
+	Digging = 0x01,
+	StoppedDigging = 0x02,
+	BlockBroken = 0x03,
+	DropItem = 0x04
+}
+
+enum Face : byte
+{
+	BottomY = 0x00,
+	TopY = 0x01,
+	BottomZ = 0x02,
+	TopZ = 0x03,
+	BottomX = 0x04,
+	TopX = 0x05
+	
+}
+
 public bool variableLength(PacketID type)
 {
 	switch(type)
@@ -632,10 +652,177 @@ class PlayerPositionLook : Sendable, Receivable
 
 class PlayerDigging : Sendable
 {
-	private byte _status, _face;
+	private byte _status, _face, _z;
 	private int _x, _y;
+	
+	public PacketID packetID()
+	{
+		return PacketID.PlayerDigging;
+	}
+	
+	public this(byte status, int x, byte y, int z, byte face)
+	{
+		this._status = status;
+		this._x = x;
+		this._y = y;
+		this._z = z;
+		this._face = face;
+	}
+	
+	public void send(MinecraftDataOutput output)
+	{
+		output.putByte(packetID);
+		output.putByte(_status);
+		output.putInt(_x);
+		output.putByte(_y);
+		output.putInt(_z);
+		output.putByte(_face);
+	}
+}
+
+class PlayerBlockPlacement : Sendable, Receivable
+{
+	static this()
+	{
+		addHandler(PlayerBlockPlacement.classinfo);
+	}
+	
+	public size_t minSize()
+	{
+		return 13;
+	}
+	
+	public PacketID packetID()
+	{
+		return PacketID.PlayerBlockPlacement;
+	}
+	
+	private int _x, _z;
+	private byte _y, _direction, _amount;
+	union
+	{
+		private short _block;
+		private short _itemID;
+	}
+	private short _damage;
+	
+	public this(int x, byte y, int z, byte direction, short blockOrItem, byte amount = 0, short damage = 0)
+	{
+		this._x = x;
+		this._y = y;
+		this._z = z;
+		this._direction = direction;
+		this._block = blockOrItem;
+		this._amount = amount;
+		this._damage = damage;
+	}
+	
+	public int receive(MinecraftDataInput input)
+	{
+		_x = input.getInt();
+		_y = input.getByte();
+		_z = input.getInt();
+		_direction = input.getByte();
+		_block = input.getShort();
+		if(_block >= 0)
+		{
+			_amount = input.getByte();
+			_damage = input.getShort();
+		}
+		
+		return (_block >= 0) ? minSize + 2 : minSize;
+	}
+	
+	public void send(MinecraftDataOutput output)
+	{
+		output.putByte(packetID);
+		output.putInt(_x);
+		output.putByte(_y);
+		output.putInt(_z);
+		output.putByte(_direction);
+		output.putShort(_block);
+		if(_block >= 0)
+		{
+			output.putByte(_amount);
+			output.putShort(_damage);
+		}
+	}
+}
+
+class HoldingChange : Sendable
+{
+	private short _slotID;
+	
+	public PacketID packetID()
+	{
+		return PacketID.HoldingChange;
+	}
+	
+	public this(short slotID)
+	{
+		_slotID = slotID;
+	}
+	
+	public void send(MinecraftDataOutput output)
+	{
+		output.putByte(packetID);
+		output.putShort(_slotID);
+	}
+}
+
+class Animation : Sendable, Receivable
+{
+	static this()
+	{
+		addHandler(Animation.classinfo);
+	}
+	
+	private int _EID;
+	private byte _animate;
+	
+	public size_t minSize()
+	{
+		return 6;
+	}
+	
+	public PacketID packetID()
+	{
+		return PacketID.Animation;
+	}
+	
+	public this(int EID, byte animate)
+	{
+		this._EID = EID;
+		this._animate = animate;
+	}
 	
 	public this()
 	{
+		
+	}
+	
+	public int receive(MinecraftDataInput input)
+	{
+		_EID = input.getInt();
+		_animate = input.getByte();
+		
+		return minSize;
+	}
+	
+	public void send(MinecraftDataOutput output)
+	{
+		output.putByte(packetID);
+		output.putInt(_EID);
+		output.putByte(_animate);
+	}
+	
+	public int EID()
+	{
+		return _EID;
+	}
+	
+	public byte animate()
+	{
+		return _animate;
 	}
 }
