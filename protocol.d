@@ -438,21 +438,204 @@ class SpawnPosition : Receivable
 		
 		return minSize;
 	}
-}
-
-public class Player : Sendable
-{
-	static this()
+	
+	public int x()
 	{
-		addHandler(Player.classinfo);
+		return _x;
 	}
 	
+	public int y()
+	{
+		return _y;
+	}
+	
+	public int z()
+	{
+		return _z;
+	}
+}
+
+class Player : Sendable
+{	
 	private bool _onGround;
+	
+	public PacketID packetID()
+	{
+		return PacketID.Player;
+	}
 	
 	public this(bool onGround)
 	{
 		_onGround = onGround;
 	}
 	
+	public void send(MinecraftDataOutput output)
+	{
+		output.putByte(packetID);
+		output.putBool(_onGround);
+	}
+}
+
+class PlayerPosition : Sendable
+{	
+	public PacketID packetID()
+	{
+		return PacketID.PlayerPosition;
+	}
 	
+	private double _x, _y, _z, _stance;
+	private bool _onGround;
+	
+	public this(double x, double y, double z, double stance, bool onGround)
+	{
+		this._x = x;
+		this._y = y;
+		this._z = z;
+		this._x = x;
+		this._stance = stance;
+		this._onGround = onGround;
+	}
+	
+	public void send(MinecraftDataOutput output)
+	{
+		output.putByte(packetID);
+		output.putFloat(_x);
+		output.putFloat(_y);
+		output.putFloat(_stance);
+		output.putFloat(_z);
+		output.putBool(_onGround);
+	}
+}
+
+class PlayerLook : Sendable
+{	
+	public PacketID packetID()
+	{
+		return PacketID.PlayerLook;
+	}
+	
+	private float _yaw, _pitch;
+	private bool _onGround;
+	
+	public this(float yaw, float pitch, bool onGround)
+	{
+		this._yaw = yaw;
+		this._pitch = pitch;
+		this._onGround = onGround;
+	}
+	
+	public void send(MinecraftDataOutput output)
+	{
+		output.putByte(packetID);
+		output.putFloat(_yaw);
+		output.putFloat(_pitch);
+		output.putBool(_onGround);
+	}
+}
+
+class PlayerPositionLook : Sendable, Receivable
+{
+	static this()
+	{
+		addHandler(PlayerPositionLook.classinfo);
+	}
+	
+	private double _x, _y, _z, _stance;
+	private float _yaw, _pitch;
+	private bool _onGround;
+	
+	public size_t minSize()
+	{
+		return 42;
+	}
+	
+	public PacketID packetID()
+	{
+		return PacketID.PlayerPositionLook;
+	}
+	
+	public this()
+	{
+	}
+	
+	public this(double x, double y, double z, double stance, float yaw, float pitch, bool onGround)
+	{
+		this._x = x;
+		this._y = y;
+		this._z = z;
+		this._stance = stance;
+		this._yaw = yaw;
+		this._pitch = pitch;
+		this._onGround = onGround;
+	}
+	
+	public double x()
+	{
+		return _x;
+	}
+	
+	public double y()
+	{
+		return _y;
+	}
+	
+	public double z()
+	{
+		return _z;
+	}
+	
+	public double stance()
+	{
+		return _stance;
+	}
+	
+	public float yaw()
+	{
+		return _yaw;
+	}
+	
+	public float pitch()
+	{
+		return _pitch;
+	}
+	
+	public bool onGround()
+	{
+		return _onGround;
+	}
+	
+	public void send(MinecraftDataOutput output)
+	{
+		output.putByte(packetID);
+		output.putFloat(_x);
+		output.putFloat(_stance);
+		output.putFloat(_y);
+		output.putFloat(_z);
+		output.putFloat(_yaw);
+		output.putFloat(_pitch);
+		output.putBool(_onGround);
+	}
+	
+	public int receive(MinecraftDataInput input)
+	{
+		_x = input.getDouble();
+		_y = input.getDouble();
+		_stance = input.getDouble();
+		_z = input.getDouble();
+		_yaw = input.getFloat();
+		_pitch = input.getFloat();
+		_onGround = input.getBool();
+		
+		return minSize;
+	}
+}
+
+class PlayerDigging : Sendable
+{
+	private byte _status, _face;
+	private int _x, _y;
+	
+	public this()
+	{
+	}
 }
