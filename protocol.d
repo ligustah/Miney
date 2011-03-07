@@ -3,11 +3,36 @@ module protocol;
 import tango.io.stream.Data;
 import tango.io.device.Conduit;
 
+import tango.core.Traits;
+
 import tango.io.Stdout;
 
 static const int ProtocolVersion = 9;
 
+static char[] moduleName = __FILE__;
+
 static ClassInfo[PacketID] PacketHandlers;
+
+static this()
+{
+	moduleName = moduleName[0..$-2];
+	foreach(mod; ModuleInfo)
+	{
+		if(mod.name == moduleName)
+		{
+			findHandlers(mod);
+		}
+	}
+}
+
+static void findHandlers(ModuleInfo mod)
+{
+	foreach(cl; mod.localClasses)
+	{
+		if(implements(cl, Receivable.classinfo))
+			addHandler(cl);
+	}
+}
 
 static bool implements(ClassInfo ci, ClassInfo interfac)
 {
@@ -23,6 +48,8 @@ static bool implements(ClassInfo ci, ClassInfo interfac)
 
 static void addHandler(ClassInfo ci)
 {
+	if(!implements(ci, Receivable.classinfo))
+		return;
 	scope Receivable o = cast(Receivable)ci.create();
 	
 	if(o)
@@ -36,9 +63,19 @@ static void addHandler(ClassInfo ci)
 	}
 }
 
-template getter(char[] name)
+template _getter(char[] name)
 {
-	static const char[] getter = "public typeof(_" ~ name ~ ") " ~ name ~ "(){ return _" ~ name ~ ";}";
+	const char[] _getter = "public typeof(_" ~ name ~ ") " ~ name ~ "(){ return _" ~ name ~ ";}";
+}
+
+template _minSize(size_t i)
+{
+	const char[] _minSize = "public size_t minSize(){ return " ~ ctfe_i2a(i) ~ "; }";
+}
+
+template _packetID(char[] id)
+{
+	const char[] _packetID = "public PacketID packetID(){ return PacketID." ~ id ~ "; }";
 }
 
 enum PacketID : ubyte
@@ -180,6 +217,13 @@ class MinecraftDataOutput : DataOutput
 		return this;
 	}
 	
+	public typeof(this) put(long l)
+	{
+		putLong(l);
+		
+		return this;
+	}
+	
 	public typeof(this) put(short s)
 	{
 		putShort(s);
@@ -259,6 +303,13 @@ class MinecraftDataInput : DataInput
 		return this;
 	}
 	
+	public typeof(this) get(out long l)
+	{
+		l = getLong();
+		
+		return this;
+	}
+	
 	public typeof(this) get(out byte b)
 	{
 		b = getByte();
@@ -304,21 +355,9 @@ interface Receivable
 }
 
 class KeepAlive : Receivable, Sendable
-{
-	static this()
-	{
-		addHandler(KeepAlive.classinfo);
-	}
-	
-	public size_t minSize()
-	{
-		return 1;
-	}
-	
-	public PacketID packetID()
-	{
-		return PacketID.KeepAlive;
-	}
+{	
+	mixin(_packetID!("KeepAlive"));
+	mixin(_minSize!(1));
 	
 	public int receive(MinecraftDataInput input)
 	{
@@ -327,7 +366,8 @@ class KeepAlive : Receivable, Sendable
 	
 	public void send(MinecraftDataOutput output)
 	{
-		output.putByte(packetID);
+		output
+		|packetID;
 	}
 	
 	public this()
@@ -337,10 +377,8 @@ class KeepAlive : Receivable, Sendable
 
 class Login : Sendable, Receivable
 {
-	static this()
-	{
-		addHandler(Login.classinfo);
-	}
+	mixin(_packetID!("Login"));
+	mixin(_minSize!(18));
 	
 	union
 	{
@@ -352,15 +390,11 @@ class Login : Sendable, Receivable
 	private long _mapSeed;
 	private byte _dimension;
 	
-	public size_t minSize()
-	{
-		return 18;
-	}
-	
-	public PacketID packetID()
-	{
-		return PacketID.Login;
-	}
+	mixin(_getter!("entityID"));
+	mixin(_getter!("username"));
+	mixin(_getter!("password"));
+	mixin(_getter!("mapSeed"));
+	mixin(_getter!("dimension"));
 	
 	public this(char[] username, char[] password)
 	{
@@ -376,42 +410,32 @@ class Login : Sendable, Receivable
 	
 	public int receive(MinecraftDataInput input)
 	{
-		_entityID = input.getInt();
-		_username = input.getString();
-		_password = input.getString();
-		_mapSeed = input.getLong();
-		_dimension = input.getByte();
+		input
+		|_entityID
+		|_username
+		|_password
+		|_mapSeed
+		|_dimension;
 		
 		return minSize + _username.length + _password.length;
 	}
 	
 	public void send(MinecraftDataOutput output)
 	{
-		output.putByte(packetID);
-		output.putInt(_protocolVersion);
-		output.putString(_username);
-		output.putString(_password);
-		output.putLong(0);	// map seed
-		output.putByte(0);	// dimension
-	}
-	
-	public int entityID()
-	{
-		return _entityID;
-	}
-	
-	public long mapSeed()
-	{
-		return _mapSeed;
+		output
+		|packetID
+		|_protocolVersion
+		|_username
+		|_password
+		|0	//map seed
+		|0;	//dimension
 	}
 }
 
 class Handshake : Sendable, Receivable
 {
-	static this()
-	{
-		addHandler(Handshake.classinfo);
-	}
+	mixin(_packetID!("Handshake"));
+	mixin(_minSize!(3));
 	
 	union
 	{
@@ -419,18 +443,11 @@ class Handshake : Sendable, Receivable
 		private char[] _connectionHash;
 	}
 	
+	mixin(_getter!("username"));
+	mixin(_getter!("connectionHash"));
+	
 	public static const char[] AUTH_NONE = "-";
 	public static const char[] AUTH_PASSWORD = "+";
-	
-	public size_t minSize()
-	{
-		return 3;
-	}
-	
-	public PacketID packetID()
-	{
-		return PacketID.Handshake;
-	}
 	
 	public this(char[] username)
 	{
@@ -441,20 +458,17 @@ class Handshake : Sendable, Receivable
 	{
 	}
 	
-	public char[] connectionHash()
-	{
-		return _connectionHash;
-	}
-	
 	public void send(MinecraftDataOutput output)
 	{
-		output.putByte(PacketID.Handshake);
-		output.putString(_username);
+		output
+		|packetID
+		|_username;
 	}
 	
 	public int receive(MinecraftDataInput input)
 	{
-		_connectionHash = input.getString();
+		input
+		|_connectionHash;
 		
 		return minSize + _connectionHash.length;
 	}
@@ -462,22 +476,12 @@ class Handshake : Sendable, Receivable
 
 class Chat : Sendable, Receivable
 {
-	static this()
-	{
-		addHandler(Chat.classinfo);
-	}
-	
+	mixin(_packetID!("Chat"));
+	mixin(_minSize!(3));
+
 	char[] _message;
 	
-	public size_t minSize()
-	{
-		return 3;
-	}
-	
-	public PacketID packetID()
-	{
-		return PacketID.Chat;
-	}
+	mixin(_getter!("message"));
 	
 	public this(char[] message)
 	{
@@ -491,46 +495,28 @@ class Chat : Sendable, Receivable
 	
 	public int receive(MinecraftDataInput input)
 	{
-		_message = input.getString();
+		input
+		|_message;
 		
 		return minSize + _message.length;
 	}
 	
 	public void send(MinecraftDataOutput output)
 	{
-		output.putByte(packetID);
-		output.putString(_message);
-	}
-	
-	public char[] message()
-	{
-		return _message;
-	}
-	
-	public void message(char[] msg)
-	{
-		_message = msg;
+		output
+		|packetID
+		|_message;
 	}
 }
 
 class TimeUpdate : Receivable
 {
-	static this()
-	{
-		addHandler(TimeUpdate.classinfo);
-	}
-	
+	mixin(_packetID!("TimeUpdate"));
+	mixin(_minSize!(9));
+
 	private long _time;
 	
-	public PacketID packetID()
-	{
-		return PacketID.TimeUpdate;
-	}
-	
-	public size_t minSize()
-	{
-		return 9;
-	}
+	mixin(_getter!("time"));
 	
 	public this()
 	{
@@ -538,80 +524,46 @@ class TimeUpdate : Receivable
 	
 	public int receive(MinecraftDataInput input)
 	{
-		_time = input.getLong();
+		input
+		|_time;
 		
 		return minSize;
-	}
-	
-	public long time()
-	{
-		return _time;
 	}
 }
 
 class SpawnPosition : Receivable
 {
-	static this()
-	{
-		addHandler(SpawnPosition.classinfo);
-	}
+	mixin(_minSize!(13));
+	mixin(_packetID!("SpawnPosition"));
 	
 	private int _x, _y, _z;
 	
-	public size_t minSize()
-	{
-		return 13;
-	}
-	
-	public PacketID packetID()
-	{
-		return PacketID.SpawnPosition;
-	}
+	mixin(_getter!("x"));
+	mixin(_getter!("y"));
+	mixin(_getter!("z"));
 	
 	public int receive(MinecraftDataInput input)
 	{
-		_x = input.getInt();
-		_y = input.getInt();
-		_z = input.getInt();
+		input
+		|_x
+		|_y
+		|_z;
 		
 		return minSize;
-	}
-	
-	public int x()
-	{
-		return _x;
-	}
-	
-	public int y()
-	{
-		return _y;
-	}
-	
-	public int z()
-	{
-		return _z;
 	}
 }
 
 class UseEntity : Sendable, Receivable
 {
-	static this()
-	{
-		addHandler(UseEntity.classinfo);
-	}
-	
-	public size_t minSize()
-	{
-		return 10;
-	}
-	
-	public PacketID packetID()
-	{
-		return PacketID.UseEntity;
-	}
+	mixin(_packetID!("UseEntity"));
+	mixin(_minSize!(10));
 	
 	private int _user, _target;
 	private bool _leftClick;
+	
+	mixin(_getter!("user"));
+	mixin(_getter!("target"));
+	mixin(_getter!("leftClick"));
 	
 	public this(int user, int target, bool leftClick)
 	{
@@ -626,85 +578,46 @@ class UseEntity : Sendable, Receivable
 	
 	public int receive(MinecraftDataInput input)
 	{
-		_user = input.getInt();
-		_target = input.getInt();
-		_leftClick = input.getBool();
+		input
+		|_user
+		|_target
+		|_leftClick;
 		
 		return minSize;
 	}
 	
 	public void send(MinecraftDataOutput output)
 	{
-		output.putByte(packetID);
-		output.putInt(_user);
-		output.putInt(_target);
-		output.putBool(_leftClick);
-	}
-	
-	public int user()
-	{
-		return _user;
-	}
-	
-	public int target()
-	{
-		return _target;
-	}
-	
-	public bool leftClick()
-	{
-		return _leftClick;
+		output
+		|packetID
+		|_user
+		|_target
+		|_leftClick;
 	}
 }
 
 class UpdateHealth : Receivable
-{
-	static this()
-	{
-		addHandler(UpdateHealth.classinfo);
-	}
-	
-	public PacketID packetID()
-	{
-		return PacketID.UpdateHealth;
-	}
-	
-	public size_t minSize()
-	{
-		return 3;
-	}
+{	
+	mixin(_packetID!("UpdateHealth"));
+	mixin(_minSize!(3));
 	
 	private short _health;
 	
+	mixin(_getter!("health"));
+	
 	public int receive(MinecraftDataInput input)
 	{
-		_health = input.getShort();
+		input
+		|_health;
 		
 		return minSize;
-	}
-	
-	public short health()
-	{
-		return _health;
 	}
 }
 
 class Respawn : Sendable, Receivable
 {
-	static this()
-	{
-		addHandler(Respawn.classinfo);
-	}
-	
-	public size_t minSize()
-	{
-		return 1;
-	}
-	
-	public PacketID packetID()
-	{
-		return PacketID.Respawn;
-	}
+	mixin(_minSize!(1));
+	mixin(_packetID!("Respawn"));
 	
 	public int receive(MinecraftDataInput input)
 	{
@@ -719,12 +632,9 @@ class Respawn : Sendable, Receivable
 
 class Player : Sendable
 {	
+	mixin(_packetID!("Player"));
+
 	private bool _onGround;
-	
-	public PacketID packetID()
-	{
-		return PacketID.Player;
-	}
 	
 	public this(bool onGround)
 	{
@@ -733,17 +643,15 @@ class Player : Sendable
 	
 	public void send(MinecraftDataOutput output)
 	{
-		output.putByte(packetID);
-		output.putBool(_onGround);
+		output
+		|packetID
+		|_onGround;
 	}
 }
 
 class PlayerPosition : Sendable
-{	
-	public PacketID packetID()
-	{
-		return PacketID.PlayerPosition;
-	}
+{
+	mixin(_packetID!("PlayerPosition"));
 	
 	private double _x, _y, _z, _stance;
 	private bool _onGround;
@@ -760,21 +668,19 @@ class PlayerPosition : Sendable
 	
 	public void send(MinecraftDataOutput output)
 	{
-		output.putByte(packetID);
-		output.putFloat(_x);
-		output.putFloat(_y);
-		output.putFloat(_stance);
-		output.putFloat(_z);
-		output.putBool(_onGround);
+		output
+		|packetID
+		|_x
+		|_y
+		|_stance
+		|_z
+		|_onGround;
 	}
 }
 
 class PlayerLook : Sendable
-{	
-	public PacketID packetID()
-	{
-		return PacketID.PlayerLook;
-	}
+{
+	mixin(_packetID!("PlayerLook"));
 	
 	private float _yaw, _pitch;
 	private bool _onGround;
@@ -788,33 +694,30 @@ class PlayerLook : Sendable
 	
 	public void send(MinecraftDataOutput output)
 	{
-		output.putByte(packetID);
-		output.putFloat(_yaw);
-		output.putFloat(_pitch);
-		output.putBool(_onGround);
+		output
+		|packetID
+		|_yaw
+		|_pitch
+		|_onGround;
 	}
 }
 
 class PlayerPositionLook : Sendable, Receivable
 {
-	static this()
-	{
-		addHandler(PlayerPositionLook.classinfo);
-	}
-	
+	mixin(_packetID!("PlayerPositionLook"));
+	mixin(_minSize!(42));
+
 	private double _x, _y, _z, _stance;
 	private float _yaw, _pitch;
 	private bool _onGround;
 	
-	public size_t minSize()
-	{
-		return 42;
-	}
-	
-	public PacketID packetID()
-	{
-		return PacketID.PlayerPositionLook;
-	}
+	mixin(_getter!("x"));
+	mixin(_getter!("y"));
+	mixin(_getter!("z"));
+	mixin(_getter!("stance"));
+	mixin(_getter!("yaw"));
+	mixin(_getter!("pitch"));
+	mixin(_getter!("onGround"));
 	
 	public this()
 	{
@@ -831,62 +734,29 @@ class PlayerPositionLook : Sendable, Receivable
 		this._onGround = onGround;
 	}
 	
-	public double x()
-	{
-		return _x;
-	}
-	
-	public double y()
-	{
-		return _y;
-	}
-	
-	public double z()
-	{
-		return _z;
-	}
-	
-	public double stance()
-	{
-		return _stance;
-	}
-	
-	public float yaw()
-	{
-		return _yaw;
-	}
-	
-	public float pitch()
-	{
-		return _pitch;
-	}
-	
-	public bool onGround()
-	{
-		return _onGround;
-	}
-	
 	public void send(MinecraftDataOutput output)
 	{
-		output.putByte(packetID);
-		output.putFloat(_x);
-		output.putFloat(_stance);
-		output.putFloat(_y);
-		output.putFloat(_z);
-		output.putFloat(_yaw);
-		output.putFloat(_pitch);
-		output.putBool(_onGround);
+		output
+		|packetID
+		|_x
+		|_stance
+		|_y
+		|_z
+		|_yaw
+		|_pitch
+		|_onGround;
 	}
 	
 	public int receive(MinecraftDataInput input)
 	{
-		_x = input.getDouble();
-		_y = input.getDouble();
-		_stance = input.getDouble();
-		_z = input.getDouble();
-		_yaw = input.getFloat();
-		_pitch = input.getFloat();
-		_onGround = input.getBool();
+		input
+		|_x
+		|_y
+		|_stance
+		|_z
+		|_yaw
+		|_pitch
+		|_onGround;
 		
 		return minSize;
 	}
@@ -894,13 +764,10 @@ class PlayerPositionLook : Sendable, Receivable
 
 class PlayerDigging : Sendable
 {
+	mixin(_packetID!("PlayerDigging"));
+
 	private byte _status, _face, _z;
 	private int _x, _y;
-	
-	public PacketID packetID()
-	{
-		return PacketID.PlayerDigging;
-	}
 	
 	public this(byte status, int x, byte y, int z, byte face)
 	{
@@ -913,37 +780,35 @@ class PlayerDigging : Sendable
 	
 	public void send(MinecraftDataOutput output)
 	{
-		output.putByte(packetID);
-		output.putByte(_status);
-		output.putInt(_x);
-		output.putByte(_y);
-		output.putInt(_z);
-		output.putByte(_face);
+		output
+		|packetID
+		|_status
+		|_x
+		|_y
+		|_z
+		|_face;
 	}
 }
 
 class PlayerBlockPlacement : Sendable, Receivable
 {
-	static this()
-	{
-		addHandler(PlayerBlockPlacement.classinfo);
-	}
-	
-	public size_t minSize()
-	{
-		return 13;
-	}
-	
-	public PacketID packetID()
-	{
-		return PacketID.PlayerBlockPlacement;
-	}
+	mixin(_packetID!("PlayerBlockPlacement"));
+	mixin(_minSize!(13));
 	
 	private int _x, _z;
 	private byte _y, _direction, _amount;
 	private short _block;
 	private alias _block _itemID;
 	private short _damage;
+	
+	mixin(_getter!("x"));
+	mixin(_getter!("y"));
+	mixin(_getter!("z"));
+	mixin(_getter!("direction"));
+	mixin(_getter!("amount"));
+	mixin(_getter!("block"));
+	mixin(_getter!("itemID"));
+	mixin(_getter!("damage"));
 	
 	public this()
 	{
@@ -962,15 +827,16 @@ class PlayerBlockPlacement : Sendable, Receivable
 	
 	public int receive(MinecraftDataInput input)
 	{
-		_x = input.getInt();
-		_y = input.getByte();
-		_z = input.getInt();
-		_direction = input.getByte();
-		_block = input.getShort();
+		input
+		|_x
+		|_y
+		|_z
+		|_direction
+		|_block;
+		
 		if(_block >= 0)
 		{
-			_amount = input.getByte();
-			_damage = input.getShort();
+			input|_amount|_damage;
 		}
 		
 		return (_block >= 0) ? minSize + 2 : minSize;
@@ -978,43 +844,16 @@ class PlayerBlockPlacement : Sendable, Receivable
 	
 	public void send(MinecraftDataOutput output)
 	{
-		output.putByte(packetID);
-		output.putInt(_x);
-		output.putByte(_y);
-		output.putInt(_z);
-		output.putByte(_direction);
-		output.putShort(_block);
+		output
+		|packetID
+		|_x
+		|_y
+		|z
+		|direction
+		|_block;
+		
 		if(_block >= 0)
-		{
-			output.putByte(_amount);
-			output.putShort(_damage);
-		}
-	}
-	
-	public int x()
-	{
-		return _x;
-	}
-	
-	public byte y()
-	{
-		return _y;
-	}
-	
-	public int z()
-	{
-		return _z;
-	}
-	
-	public byte direction()
-	{
-		return _direction;
-	}
-	
-	public alias block itemID;
-	public byte block()
-	{
-		return _block;
+			output|_amount|_damage;
 	}
 }
 
@@ -1034,82 +873,48 @@ class HoldingChange : Sendable
 	
 	public void send(MinecraftDataOutput output)
 	{
-		output.putByte(packetID);
-		output.putShort(_slotID);
+		output
+		|packetID
+		|_slotID;
 	}
 }
 
 class UseBed : Receivable
 {
-	static this()
-	{
-		addHandler(UseBed.classinfo);
-	}
-	
-	public PacketID packetID()
-	{
-		return PacketID.UseBed;
-	}
-	
-	public size_t minSize()
-	{
-		return 15;
-	}
+	mixin(_packetID!("UseBed"));
+	mixin(_minSize!(15));
 	
 	private int _entityID, _x, _z;
 	private byte _unknown, _y;
 	
+	mixin(_getter!("entityID"));
+	mixin(_getter!("x"));
+	mixin(_getter!("y"));
+	mixin(_getter!("z"));
+	
 	public int receive(MinecraftDataInput input)
 	{
-		_entityID = input.getInt();
-		_unknown = input.getByte();
-		_x = input.getInt();
-		_y = input.getByte();
-		_z = input.getInt();
+		input
+		|_entityID
+		|_unknown
+		|_x
+		|_y
+		|_z;
 		
 		return minSize;
-	}
-	
-	public int entityID()
-	{
-		return _entityID;
-	}
-	
-	public int x()
-	{
-		return _x;
-	}
-	
-	public byte y()
-	{
-		return _y;
-	}
-	
-	public int z()
-	{
-		return _z;
 	}
 }
 
 class Animation : Sendable, Receivable
 {
-	static this()
-	{
-		addHandler(Animation.classinfo);
-	}
+	mixin(_minSize!(6));
+	mixin(_packetID!("Animation"));
 	
 	private int _EID;
 	private byte _animate;
 	
-	public size_t minSize()
-	{
-		return 6;
-	}
-	
-	public PacketID packetID()
-	{
-		return PacketID.Animation;
-	}
+	mixin(_getter!("animate"));
+	mixin(_getter!("EID"));
 	
 	public this(int EID, byte animate)
 	{
@@ -1124,8 +929,9 @@ class Animation : Sendable, Receivable
 	
 	public int receive(MinecraftDataInput input)
 	{
-		_EID = input.getInt();
-		_animate = input.getByte();
+		input
+		|_EID
+		|_animate;
 		
 		return minSize;
 	}
@@ -1137,40 +943,18 @@ class Animation : Sendable, Receivable
 		|_EID
 		|_animate;
 	}
-	
-	public int EID()
-	{
-		return _EID;
-	}
-	
-	public byte animate()
-	{
-		return _animate;
-	}
 }
 
 class EntityAction : Receivable, Sendable
 {
-	static this()
-	{
-		addHandler(EntityAction.classinfo);
-	}
-	
-	public size_t minSize()
-	{
-		return 6;
-	}
-	
-	public PacketID packetID()
-	{
-		return PacketID.EntityAction;
-	}
+	mixin(_minSize!(6));
+	mixin(_packetID!("EntityAction"));
 	
 	private int _entityID;
 	private byte _action;
 	
-	mixin(getter!("entityID"));
-	mixin(getter!("action"));
+	mixin(_getter!("entityID"));
+	mixin(_getter!("action"));
 	
 	public this()
 	{
@@ -1199,3 +983,4 @@ class EntityAction : Receivable, Sendable
 		return minSize;
 	}
 }
+
