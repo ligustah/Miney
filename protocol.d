@@ -124,7 +124,7 @@ enum PacketID : ubyte
 	PlayNoteBlock = 0x36,
 	Explosion = 0x3C,
 	OpenWindow = 0x64,
-	CloseWindows = 0x65,
+	CloseWindow = 0x65,
 	WindowClick = 0x66,
 	SetSlot = 0x67,
 	WindowItems = 0x68,
@@ -152,6 +152,75 @@ enum Face : byte
 	BottomX = 0x04,
 	TopX = 0x05
 	
+}
+
+enum ObjectType : byte
+{
+	Boat = 0x01,
+	Minecart = 0x10,
+	StorageCart = 0x11,
+	PoweredCart = 0x12,
+	TNT = 0x32,
+	Arrow = 0x3c,
+	SnowBall = 0x3d,
+	Egg = 0x3e,
+	Sand = 0x46,
+	Gravel = 0x47,
+	FishingFloat = 0x5a
+}
+
+enum MobType : byte
+{
+	Creeper = 0x32,
+	Skeleton = 0x33,
+	Spider = 0x34,
+	GiantZombie = 0x35,
+	Zombie = 0x36,
+	Slime = 0x37,
+	Ghast = 0x38,
+	ZombiePigman = 0x39,
+	Pig = 0x5a,
+	Sheep = 0x5b,
+	Cow = 0x5c,
+	Hen = 0x5d,
+	Squid = 0x5e
+}
+
+enum WoolColor : byte
+{
+	White = 0x00,
+	Orange = 0x01,
+	Magenta = 0x02,
+	LightBlue = 0x03,
+	Yellow = 0x04,
+	Lime = 0x05,
+	Pink = 0x06,
+	Gray = 0x07,
+	Silver = 0x08,
+	Cyan = 0x09,
+	Purple = 0x0a,
+	Blue = 0x0b,
+	Brown = 0x0c,
+	Green = 0x0d,
+	Red = 0x0e,
+	Black = 0x0f
+}
+
+enum InstrumentType : byte
+{
+	Harp = 0x00,
+	DoubleBass = 0x01,
+	SnareDrum = 0x02,
+	Sticks = 0x03,
+	BassDrum = 0x04
+}
+
+enum InventoryType : byte
+{
+	Chest = 0x00,
+	Workbench = 0x01,
+	Furnace = 0x02,
+	Dispenser = 0x03
 }
 
 public bool variableLength(PacketID type)
@@ -339,6 +408,48 @@ class MinecraftDataInput : DataInput
 	}
 	
 	public alias get opOr;
+	
+	public void metadata()
+	{
+		byte x;
+		int n = 0;
+		
+		while(true)
+		{
+			this|x;
+			
+			if(x == 0x7F)
+				break;
+				
+			Stdout.format("{}: ", n++);
+				
+			byte y = x >> 5;
+			
+			switch(y)
+			{
+				case 0:
+					Stdout.formatln("{}", getByte);
+					break;
+				case 1:
+					Stdout.formatln("{}", getShort);
+					break;
+				case 2:
+					Stdout.formatln("{}", getInt);
+					break;
+				case 3:
+					Stdout.formatln("{}", getFloat);
+					break;
+				case 4:
+					Stdout.formatln("{}", getString);
+					break;
+				case 5:
+					Stdout.formatln("{} {} {}", getShort, getByte, getShort);
+					break;
+				default:
+					assert(0, "invalid metadata");
+			}
+		}
+	}
 }
 
 interface Sendable
@@ -383,14 +494,14 @@ class Login : Sendable, Receivable
 	union
 	{
 		private int _protocolVersion;
-		private int _entityID;
+		private int _EID;
 	}
 	private char[] _username;
 	private char[] _password;
 	private long _mapSeed;
 	private byte _dimension;
 	
-	mixin(_getter!("entityID"));
+	mixin(_getter!("EID"));
 	mixin(_getter!("username"));
 	mixin(_getter!("password"));
 	mixin(_getter!("mapSeed"));
@@ -411,7 +522,7 @@ class Login : Sendable, Receivable
 	public int receive(MinecraftDataInput input)
 	{
 		input
-		|_entityID
+		|_EID
 		|_username
 		|_password
 		|_mapSeed
@@ -884,10 +995,10 @@ class UseBed : Receivable
 	mixin(_packetID!("UseBed"));
 	mixin(_minSize!(15));
 	
-	private int _entityID, _x, _z;
+	private int _EID, _x, _z;
 	private byte _unknown, _y;
 	
-	mixin(_getter!("entityID"));
+	mixin(_getter!("EID"));
 	mixin(_getter!("x"));
 	mixin(_getter!("y"));
 	mixin(_getter!("z"));
@@ -895,7 +1006,7 @@ class UseBed : Receivable
 	public int receive(MinecraftDataInput input)
 	{
 		input
-		|_entityID
+		|_EID
 		|_unknown
 		|_x
 		|_y
@@ -950,19 +1061,19 @@ class EntityAction : Receivable, Sendable
 	mixin(_minSize!(6));
 	mixin(_packetID!("EntityAction"));
 	
-	private int _entityID;
+	private int _EID;
 	private byte _action;
 	
-	mixin(_getter!("entityID"));
+	mixin(_getter!("EID"));
 	mixin(_getter!("action"));
 	
 	public this()
 	{
 	}
 	
-	public this(int entityID, byte action)
+	public this(int EID, byte action)
 	{
-		this._entityID = entityID;
+		this._EID = EID;
 		this._action = action;
 	}
 	
@@ -970,17 +1081,1048 @@ class EntityAction : Receivable, Sendable
 	{
 		output
 		|packetID
-		|_entityID
+		|_EID
 		|_action;
 	}
 	
 	public int receive(MinecraftDataInput input)
 	{
 		input
-		|_entityID
+		|_EID
 		|_action;
 		
 		return minSize;
 	}
 }
 
+class NamedEntitySpawn : Receivable
+{
+	mixin(_packetID!("NamedEntitySpawn"));
+	mixin(_minSize!(23));
+	
+	private int _EID, _x, _y, _z;
+	private char[] _name;
+	private byte _rotation, _pitch;
+	private short _currentItem;
+	
+	mixin(_getter!("EID"));
+	mixin(_getter!("x"));
+	mixin(_getter!("y"));
+	mixin(_getter!("z"));
+	mixin(_getter!("name"));
+	mixin(_getter!("rotation"));
+	mixin(_getter!("pitch"));
+	mixin(_getter!("currentItem"));
+	
+	public this()
+	{
+	}
+	
+	public int receive(MinecraftDataInput input)
+	{
+		input
+		|_EID
+		|_name
+		|_x
+		|_y
+		|_z
+		|_rotation
+		|_pitch
+		|_currentItem;
+		
+		return minSize + _name.length;
+	}
+}
+
+class PickupSpawn : Receivable
+{
+	mixin(_packetID!("PickupSpawn"));
+	mixin(_minSize!(25));
+	
+	private int _EID, _x, _y, _z;
+	private byte _count, _rotation, _pitch, _roll;
+	private short _itemID, _damage;
+	
+	mixin(_getter!("EID"));
+	mixin(_getter!("x"));
+	mixin(_getter!("y"));
+	mixin(_getter!("z"));
+	mixin(_getter!("count"));
+	mixin(_getter!("rotation"));
+	mixin(_getter!("pitch"));
+	mixin(_getter!("roll"));
+	mixin(_getter!("itemID"));
+	mixin(_getter!("damage"));
+	
+	public this()
+	{
+	}
+	
+	public int receive(MinecraftDataInput input)
+	{
+		input
+		|_EID
+		|_x
+		|_y
+		|_z
+		|_count
+		|_rotation
+		|_pitch
+		|_roll
+		|_itemID
+		|_damage;
+		
+		return minSize;
+	}
+}
+
+class CollectItem : Receivable
+{
+	mixin(_packetID!("CollectItem"));
+	mixin(_minSize!(9));
+	
+	private int _collected, _collector;
+	
+	mixin(_getter!("collected"));
+	mixin(_getter!("collector"));
+	
+	public this()
+	{
+	}
+	
+	public int receive(MinecraftDataInput input)
+	{
+		input
+		|_collected
+		|_collector;
+		
+		return minSize;
+	}
+}
+
+class AddObject : Receivable
+{
+	mixin(_packetID!("AddObject"));
+	mixin(_minSize!(18));
+	
+	private int _EID, _x, _y, _z;
+	private byte _type;
+	
+	mixin(_getter!("EID"));
+	mixin(_getter!("x"));
+	mixin(_getter!("y"));
+	mixin(_getter!("z"));
+	mixin(_getter!("type"));
+	
+	public this()
+	{
+	}
+	
+	public int receive(MinecraftDataInput input)
+	{
+		input
+		|_EID
+		|_type
+		|_x
+		|_y
+		|_z;
+		
+		return minSize;
+	}
+}
+
+
+// TODO metadata
+class MobSpawn : Receivable
+{
+	mixin(_packetID!("MobSpawn"));
+	mixin(_minSize!(20));
+	
+	int _EID, _x, _y, _z;
+	byte _type, _yaw, _pitch;
+	
+	mixin(_getter!("EID"));
+	mixin(_getter!("x"));
+	mixin(_getter!("y"));
+	mixin(_getter!("z"));
+	mixin(_getter!("type"));
+	mixin(_getter!("yaw"));
+	mixin(_getter!("pitch"));
+	
+	public this()
+	{
+		
+	}
+	
+	public int receive(MinecraftDataInput input)
+	{
+		input
+		|_EID
+		|_type
+		|_x
+		|_y
+		|_z
+		|_yaw
+		|_pitch;
+		
+		input.metadata();
+		
+		return minSize;
+	}
+}
+
+class EntityPainting : Receivable
+{
+	mixin(_packetID!("EntityPainting"));
+	mixin(_minSize!(23));
+	
+	private int _EID, _x, _y, _z, _type;
+	private char[] _title;
+	
+	mixin(_getter!("EID"));
+	mixin(_getter!("x"));
+	mixin(_getter!("y"));
+	mixin(_getter!("z"));
+	mixin(_getter!("type"));
+	mixin(_getter!("title"));
+	
+	public this()
+	{
+	}
+	
+	public int receive(MinecraftDataInput input)
+	{
+		input
+		|_EID
+		|_title
+		|_x
+		|_y
+		|_z
+		|_type;
+		
+		return minSize;
+	}
+}
+
+class Unknown : Receivable
+{
+	mixin(_packetID!("Unknown"));
+	mixin(_minSize!(19));
+
+	private float _u1, _u2, _u3, _u4;
+	private bool _u5, _u6;
+	
+	public this()
+	{
+	}
+	
+	public int receive(MinecraftDataInput input)
+	{
+		input
+		|_u1
+		|_u2
+		|_u3
+		|_u4
+		|_u5
+		|_u6;
+		
+		return minSize;
+	}
+}
+
+class EntityVelocity : Receivable
+{
+	mixin(_packetID!("EntityVelocity"));
+	mixin(_minSize!(11));
+	
+	private int _EID;
+	private short _x, _y, _z;
+	
+	mixin(_getter!("EID"));
+	mixin(_getter!("x"));
+	mixin(_getter!("y"));
+	mixin(_getter!("z"));
+	
+	public this()
+	{
+	}
+	
+	public int receive(MinecraftDataInput input)
+	{
+		input
+		|_EID
+		|_x
+		|_y
+		|_z;
+		
+		return minSize;
+	}
+}
+
+class DestroyEntity : Receivable
+{
+	mixin(_packetID!("DestroyEntity"));
+	mixin(_minSize!(5));
+	
+	private int _EID;
+	
+	mixin(_getter!("EID"));
+	
+	public this()
+	{
+	}
+	
+	public int receive(MinecraftDataInput input)
+	{
+		input
+		|_EID;
+		
+		return minSize;
+	}
+}
+
+class Entity : Receivable
+{
+	mixin(_packetID!("Entity"));
+	mixin(_minSize!(5));
+	
+	private int _EID;
+	
+	mixin(_getter!("EID"));
+	
+	public this()
+	{
+	}
+	
+	public int receive(MinecraftDataInput input)
+	{
+		input
+		|_EID;
+		
+		return minSize;
+	}
+}
+
+class EntityRelativeMove : Receivable
+{
+	mixin(_packetID!("EntityRelativeMove"));
+	mixin(_minSize!(8));
+	
+	private int _EID;
+	byte _dX, _dY, _dZ;
+	
+	mixin(_getter!("EID"));
+	mixin(_getter!("dX"));
+	mixin(_getter!("dY"));
+	mixin(_getter!("dZ"));
+	
+	public this()
+	{
+	}
+	
+	public int receive(MinecraftDataInput input)
+	{
+		input
+		|_EID
+		|_dX
+		|_dY
+		|_dZ;
+	
+		return minSize;
+	}
+}
+
+class EntityLook : Receivable
+{
+	mixin(_packetID!("EntityLook"));
+	mixin(_minSize!(7));
+	
+	private int _EID;
+	private byte _yaw, _pitch;
+	
+	mixin(_getter!("EID"));
+	mixin(_getter!("yaw"));
+	mixin(_getter!("pitch"));
+	
+	public this()
+	{
+	}
+	
+	public int receive(MinecraftDataInput input)
+	{
+		input
+		|_EID
+		|_yaw
+		|_pitch;
+		
+		return minSize;
+	}
+}
+
+class EntityLookRelativeMove : Receivable
+{
+	mixin(_packetID!("EntityLookRelativeMove"));
+	mixin(_minSize!(10));
+	
+	private int _EID;
+	private byte _dX, _dY, _dZ, _yaw, _pitch;
+	
+	mixin(_getter!("EID"));
+	mixin(_getter!("dX"));
+	mixin(_getter!("dY"));
+	mixin(_getter!("dZ"));
+	mixin(_getter!("yaw"));
+	mixin(_getter!("pitch"));
+	
+	public this()
+	{
+	}
+	
+	public int receive(MinecraftDataInput input)
+	{
+		input
+		|_EID
+		|_dX
+		|_dY
+		|_dZ
+		|_yaw
+		|_pitch;
+	
+		return minSize;
+	}
+}
+
+class EntityTeleport : Receivable
+{
+	mixin(_packetID!("EntityTeleport"));
+	mixin(_minSize!(19));
+	
+	private int _EID, _x, _y, _z;
+	private byte _yaw, _pitch;
+	
+	mixin(_getter!("EID"));
+	mixin(_getter!("x"));
+	mixin(_getter!("y"));
+	mixin(_getter!("z"));
+	mixin(_getter!("yaw"));
+	mixin(_getter!("pitch"));
+	
+	public this()
+	{
+	}
+	
+	public int receive(MinecraftDataInput input)
+	{
+		input
+		|_EID
+		|_x
+		|_y
+		|_z
+		|_yaw
+		|_pitch;
+	
+		return minSize;
+	}
+}
+
+class EntityStatus : Receivable
+{
+	mixin(_packetID!("EntityStatus"));
+	mixin(_minSize!(6));
+
+	private int _EID;
+	private byte _status;
+	
+	mixin(_getter!("EID"));
+	mixin(_getter!("status"));
+	
+	public this()
+	{
+	}
+	
+	public int receive(MinecraftDataInput input)
+	{
+		input
+		|_EID
+		|_status;
+		
+		return minSize;
+	}
+}
+
+class AttachEntity : Receivable
+{
+	mixin(_packetID!("AttachEntity"));
+	mixin(_minSize!(9));
+	
+	private int _EID, _vehicle;
+	
+	mixin(_getter!("EID"));
+	mixin(_getter!("vehicle"));
+	
+	public this()
+	{
+	}
+	
+	public int receive(MinecraftDataInput input)
+	{
+		input
+		|_EID
+		|_vehicle;
+		
+		return minSize;
+	}
+}
+
+class EntityMetadata : Receivable
+{
+	mixin(_packetID!("EntityMetadata"));
+	mixin(_minSize!(5));
+	
+	private int _EID;
+	
+	mixin(_getter!("EID"));
+	
+	public this()
+	{
+	}
+	
+	public int receive(MinecraftDataInput input)
+	{
+		input
+		|_EID;
+		
+		input.metadata();
+		
+		return minSize;
+	}
+}
+
+class PreChunk : Receivable
+{
+	mixin(_packetID!("PreChunk"));
+	mixin(_minSize!(10));
+	
+	private int _x, _y;
+	private bool _mode;
+	
+	mixin(_getter!("x"));
+	mixin(_getter!("y"));
+	mixin(_getter!("mode"));
+	
+	public this()
+	{
+	}
+	
+	public int receive(MinecraftDataInput input)
+	{
+		input
+		|_x
+		|_y
+		|_mode;
+		
+		return minSize;
+	}
+}
+
+
+//TODO : maybe compress map chunk data here
+class MapChunk : Receivable
+{
+	mixin(_packetID!("MapChunk"));
+	mixin(_minSize!(18));
+	
+	private int _x, _z, _size;
+	private short _y;
+	private byte _sizeX, _sizeY, _sizeZ;
+	private byte[] _data;
+	
+	mixin(_getter!("x"));
+	mixin(_getter!("y"));
+	mixin(_getter!("z"));
+	mixin(_getter!("sizeX"));
+	mixin(_getter!("sizeY"));
+	mixin(_getter!("sizeZ"));
+	mixin(_getter!("data"));
+	
+	public this()
+	{
+	}
+	
+	public int receive(MinecraftDataInput input)
+	{
+		input
+		|_x
+		|_y
+		|_z
+		|_sizeX
+		|_sizeY
+		|_sizeZ
+		|_size;
+		
+		_data = new byte[_size];
+		input.read(_data);
+		
+		return minSize + _size;
+	}
+}
+
+class MultiBlockChange : Receivable
+{
+	mixin(_packetID!("MultiBlockChange"));
+	mixin(_minSize!(11));
+	
+	private int _x, _z;
+	private short _length;
+	private short[] _coordinates;
+	private byte[] _types, _metadata;
+	
+	mixin(_getter!("length"));
+	mixin(_getter!("coordinates"));
+	mixin(_getter!("types"));
+	mixin(_getter!("metadata"));
+	
+	public this()
+	{
+	}
+	
+	public int receive(MinecraftDataInput input)
+	{
+		input
+		|_x
+		|_z
+		|_length;
+		
+		_coordinates = new short[_length];
+		_types = new byte[_length];
+		_metadata = new byte[_length];
+		
+		input.read(_coordinates);
+		input.read(_types);
+		input.read(_metadata);
+		
+		return minSize + (4 * _length); 
+	}
+}
+
+class BlockChange : Receivable
+{
+	mixin(_packetID!("BlockChange"));
+	mixin(_minSize!(12));
+	
+	private int _x, _z;
+	private byte _y, _type, _metadata;
+	
+	mixin(_getter!("x"));
+	mixin(_getter!("y"));
+	mixin(_getter!("z"));
+	mixin(_getter!("type"));
+	mixin(_getter!("metadata"));
+	
+	public this()
+	{
+	}
+	
+	public int receive(MinecraftDataInput input)
+	{
+		input
+		|_x
+		|_y
+		|_z
+		|_type
+		|_metadata;
+		
+		return minSize;
+	}
+}
+
+class PlayNoteBlock : Receivable
+{
+	mixin(_packetID!("PlayNoteBlock"));
+	mixin(_minSize!(13));
+	
+	private int _x, _z;
+	private short _y;
+	private byte _type, _pitch;
+	
+	mixin(_getter!("x"));
+	mixin(_getter!("y"));
+	mixin(_getter!("z"));
+	mixin(_getter!("type"));
+	mixin(_getter!("pitch"));
+	
+	public this()
+	{
+	}
+	
+	public int receive(MinecraftDataInput input)
+	{
+		input
+		|_x
+		|_y
+		|_z
+		|_type
+		|_pitch;
+		
+		return minSize;
+	}
+}
+
+class Explosion : Receivable
+{
+	mixin(_packetID!("Explosion"));
+	mixin(_minSize!(33));
+	
+	struct Record
+	{
+		byte x, y, z;
+	}
+		
+	private double _x, _y, _z;
+	private float _unknown;
+	private int _recordCount;
+	private Record[] _records;
+	
+	mixin(_getter!("x"));
+	mixin(_getter!("y"));
+	mixin(_getter!("z"));
+	mixin(_getter!("recordCount"));
+	mixin(_getter!("records"));
+	
+	public this()
+	{
+	}
+	
+	public int receive(MinecraftDataInput input)
+	{
+		input
+		|_x
+		|_y
+		|_z
+		|_unknown
+		|_recordCount;
+		
+		_records = new Record[_recordCount];
+		
+		for(int i = 0; i < _recordCount; i++)
+		{
+			Record r;
+			input|r.x|r.y|r.z;
+			
+			_records[i] = r;
+		}
+		
+		return minSize + 3 * _recordCount;
+	}
+}
+
+class OpenWindow : Receivable
+{
+	mixin(_packetID!("OpenWindow"));
+	mixin(_minSize!(6));
+	
+	private byte _id, _type, _slots;
+	private char[] _title;
+	
+	mixin(_getter!("id"));
+	mixin(_getter!("type"));
+	mixin(_getter!("slots"));
+	mixin(_getter!("title"));
+	
+	public this()
+	{
+	}
+	
+	public int receive(MinecraftDataInput input)
+	{
+		input
+		|_id
+		|_type
+		|_title
+		|_slots;
+		
+		return minSize + _title.length;
+	}
+}
+
+class CloseWindow : Receivable, Sendable
+{
+	mixin(_packetID!("CloseWindow"));
+	mixin(_minSize!(2));
+	
+	private byte _id;
+	
+	mixin(_getter!("id"));
+	
+	public this(byte id)
+	{
+		this._id = id;
+	}
+	
+	public this()
+	{
+	}
+	
+	public int receive(MinecraftDataInput input)
+	{
+		input
+		|_id;
+		
+		return minSize;
+	}
+	
+	public void send(MinecraftDataOutput output)
+	{
+		output
+		|packetID
+		|_id;
+	}
+}
+
+class WindowClick : Sendable
+{
+	mixin(_packetID!("WindowClick"));
+	mixin(_minSize!(9));
+	
+	private byte _id, _rightClick, _count;
+	private short _slot, _transactionID, _itemID, _uses;
+	
+	public this(byte id, short slot, byte rightClick, short transactionID, short itemID, byte count, short uses)
+	{
+		this._id = id;
+		this._slot = slot;
+		this._rightClick = rightClick;
+		this._transactionID = transactionID;
+		this._itemID = itemID;
+		this._count = count;
+		this._uses = uses;
+	}
+	
+	public void send(MinecraftDataOutput output)
+	{
+		output
+		|packetID
+		|_id
+		|_slot
+		|_rightClick
+		|_transactionID
+		|_itemID;
+		
+		if(_itemID != -1)
+		{
+			output
+			|_count
+			|_uses;
+		}
+	}
+}
+
+class SetSlot : Receivable
+{
+	mixin(_packetID!("SetSlot"));
+	mixin(_minSize!(6));
+	
+	private byte _id, _count;
+	private short _slot, _itemID, _uses;
+	
+	mixin(_getter!("id"));
+	mixin(_getter!("count"));
+	mixin(_getter!("slot"));
+	mixin(_getter!("itemID"));
+	mixin(_getter!("uses"));
+	
+	public this()
+	{
+	}
+	
+	public int receive(MinecraftDataInput input)
+	{
+		input
+		|_id
+		|_slot
+		|_itemID;
+		
+		if(_itemID != -1)
+		{
+			input
+			|_count
+			|_uses;
+		}
+		
+		return minSize;
+	}
+}
+
+class WindowItems : Receivable
+{
+	mixin(_packetID!("WindowItems"));
+	mixin(_minSize!(4));
+	
+	struct Item
+	{
+		short id;
+		byte count;
+		short uses;
+	}
+	
+	private byte _id;
+	private short _count;
+	private Item[] _items;
+
+	mixin(_getter!("id"));
+	mixin(_getter!("count"));
+	mixin(_getter!("items"));
+	
+	public this()
+	{
+	}
+	
+	public int receive(MinecraftDataInput input)
+	{
+		input
+		|_id
+		|_count;
+		
+		_items = new Item[_count];
+		
+		for(int n = 0; n < _count; n++)
+		{
+			Item i;
+			
+			input|i.id;
+			if(i.id != -1)
+			{
+				input|i.count|i.uses;
+			}
+			_items[n] = i;
+		}
+		
+		return minSize;
+	}
+}
+
+class UpdateProgress : Receivable
+{
+	mixin(_packetID!("UpdateProgress"));
+	mixin(_minSize!(6));
+	
+	private byte _id;
+	private short _bar;
+	private short _value;
+	
+	mixin(_getter!("id"));
+	mixin(_getter!("bar"));
+	mixin(_getter!("value"));
+	
+	public this()
+	{
+	}
+	
+	public int receive(MinecraftDataInput input)
+	{
+		input
+		|_id
+		|_bar
+		|_value;
+		
+		return minSize;
+	}
+}
+
+class Transaction : Receivable
+{
+	mixin(_packetID!("Transaction"));
+	mixin(_minSize!(5));
+	
+	private byte _id;
+	private short _transactionID;
+	private bool _accepted;
+	
+	mixin(_getter!("id"));
+	mixin(_getter!("transactionID"));
+	mixin(_getter!("accepted"));
+	
+	public this()
+	{
+	}
+	
+	public int receive(MinecraftDataInput input)
+	{
+		input
+		|_id
+		|_transactionID
+		|_accepted;
+		
+		return minSize;
+	}
+}
+
+class UpdateSign : Receivable
+{
+	mixin(_packetID!("UpdateSign"));
+	mixin(_minSize!(19));
+	
+	private int _x, _z;
+	private short _y;
+	private char[] _line1, _line2, _line3, _line4;
+	
+	mixin(_getter!("x"));
+	mixin(_getter!("y"));
+	mixin(_getter!("z"));
+	mixin(_getter!("line1"));
+	mixin(_getter!("line2"));
+	mixin(_getter!("line3"));
+	mixin(_getter!("line4"));
+	
+	public this()
+	{
+	}
+	
+	public int receive(MinecraftDataInput input)
+	{
+		input
+		|_x
+		|_y
+		|_z
+		|_line1
+		|_line2
+		|_line3
+		|_line4;
+		
+		return minSize + line1.length + line2.length + line3.length + line4.length;
+	}
+}
+
+class Disconnect : Receivable, Sendable
+{
+	mixin(_packetID!("Disconnect"));
+	mixin(_minSize!(3));
+	
+	private char[] _reason;
+	
+	mixin(_getter!("reason"));
+	
+	public this()
+	{
+	}
+	
+	public this(char[] reason)
+	{
+		this._reason = reason;
+	}
+	
+	public void send(MinecraftDataOutput output)
+	{
+		output
+		|packetID
+		|_reason;
+	}
+	
+	public int receive(MinecraftDataInput input)
+	{
+		input
+		|_reason;
+		
+		return minSize + _reason.length;
+	}
+}
