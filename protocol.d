@@ -137,9 +137,9 @@ enum PacketID : ubyte
 enum DiggingStatus : byte
 {
 	StartedDigging = 0x00,
-	Digging = 0x01,
-	StoppedDigging = 0x02,
-	BlockBroken = 0x03,
+	//Digging = 0x01,
+	FinishedDigging = 0x02,
+	//BlockBroken = 0x03,
 	DropItem = 0x04
 }
 
@@ -870,6 +870,14 @@ class PlayerPositionLook : Sendable, Receivable
 		|_onGround;
 		
 		return minSize;
+	}
+}
+
+class DropItem : PlayerDigging
+{
+	this()
+	{
+		super(DiggingStatus.DropItem, 0, 0, 0, 0);
 	}
 }
 
