@@ -16,9 +16,9 @@ import protocol;
 
 class Network
 {
-	private Selector _selector;
-	private LinkedList!(Miney) _bots;
-	private LinkedList!(Miney) _removeMe;
+	private Selector			_selector;
+	private LinkedList!(Miney)	_bots;
+	private LinkedList!(Miney)	_removeMe;
 	
 	public this()
 	{
@@ -208,7 +208,6 @@ class MinecraftDataInput : DataInput
 	public char[] string()
 	{
 		short len = int16;
-		Stdout.formatln("attempting to read {} chars", len);
 		char[] str = new char[len];
 		read(cast(void[])str);
 		
@@ -285,29 +284,29 @@ class MinecraftDataInput : DataInput
 			if(x == 0x7F)
 				break;
 				
-			Stdout.format("{}: ", n++);
+			//Stdout.format("{}: ", n++);
 				
 			byte y = x >> 5;
 			
 			switch(y)
 			{
 				case 0:
-					Stdout.formatln("{}", getByte);
+					Stdout.format("", getByte);
 					break;
 				case 1:
-					Stdout.formatln("{}", getShort);
+					Stdout.format("", getShort);
 					break;
 				case 2:
-					Stdout.formatln("{}", getInt);
+					Stdout.format("", getInt);
 					break;
 				case 3:
-					Stdout.formatln("{}", getFloat);
+					Stdout.format("", getFloat);
 					break;
 				case 4:
-					Stdout.formatln("{}", getString);
+					Stdout.format("", getString);
 					break;
 				case 5:
-					Stdout.formatln("{} {} {}", getShort, getByte, getShort);
+					Stdout.format("", getShort, getByte, getShort);
 					break;
 				default:
 					assert(0, "invalid metadata");

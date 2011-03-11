@@ -71,7 +71,7 @@ static void addHandler(ClassInfo ci)
 	if(o)
 	{
 		PacketHandlers[o.packetID] = ci;
-		Stdout.formatln("adding handler for packet 0x{:x} \"{}\"", o.packetID, ci.name);
+		//Stdout.formatln("adding handler for packet 0x{:x} \"{}\"", o.packetID, ci.name);
 	}
 	else
 	{
@@ -162,7 +162,6 @@ enum Face : byte
 	TopZ = 0x03,
 	BottomX = 0x04,
 	TopX = 0x05
-	
 }
 
 enum ObjectType : byte
@@ -234,6 +233,13 @@ enum InventoryType : byte
 	Dispenser = 0x03
 }
 
+/*
+enum AuthCode
+{
+	None = "-",
+	Password = "+"
+}
+*/
 class KeepAlive : Receivable, Sendable
 {	
 	mixin(_packetID!("KeepAlive"));
@@ -269,7 +275,7 @@ class Login : Sendable, Receivable
 	private long _mapSeed;
 	private byte _dimension;
 		
-	mixin(_getter!("EID", "username", "password", "mapSeed", "dimension"));
+	mixin(_getter!("EID", "mapSeed", "dimension"));
 	
 	public this(char[] username, char[] password)
 	{
@@ -319,9 +325,6 @@ class Handshake : Sendable, Receivable
 	}
 	
 	mixin(_getter!("username", "connectionHash"));
-	
-	public static const char[] AUTH_NONE = "-";
-	public static const char[] AUTH_PASSWORD = "+";
 	
 	public this(char[] username)
 	{
@@ -1412,7 +1415,7 @@ class PreChunk : Receivable
 }
 
 
-//TODO : maybe compress map chunk data here
+//TODO : maybe uncompress map chunk data here
 class MapChunk : Receivable
 {
 	mixin(_packetID!("MapChunk"));

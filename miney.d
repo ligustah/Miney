@@ -10,13 +10,18 @@ import tango.io.stream.Buffered;
 import tango.io.Stdout;
 import tango.io.stream.Buffered;
 
+import tango.time.Time;
+import tango.time.Clock;
+
 import Integer = tango.text.convert.Integer;
 
 import tango.core.Thread;
+import tango.core.Exception;
 
 import protocol;
 import network;
 import util;
+import bindings.all;
 
 class Miney : ISelectable
 {
@@ -31,9 +36,13 @@ class Miney : ISelectable
 	private Network					_network;
 	private bool					_hasHandshake = false;
 	private bool					_socketClosed = false;
+	private Time					_lastKeepAlive;
 	private int chunks = 0;
 	
-	this(char[] host, ushort port, Network n)
+	private MDVM*					_vm;
+	private MDThread*				_mainThread;
+	
+	this(char[] host, ushort port, Network n, MDVM* vm)
 	{
 		this._host = host;
 		this._port = port;
@@ -43,6 +52,8 @@ class Miney : ISelectable
 		this._outBuffer = new Bout(_socket, 1024);
 		this._input = new MinecraftDataInput(_inBuffer);
 		this._output = new MinecraftDataOutput(_outBuffer);
+		this._vm = vm;
+		this._mainThread = mainThread(vm);
 		
 		_socket.native.blocking = false;
 		_socket.connect(_host, _port);
@@ -59,7 +70,7 @@ class Miney : ISelectable
 		//Network will guarantee data to be available here
 		if(_inBuffer.populate() != _inBuffer.Eof)
 		{
-			while(parse()){}
+				while(parse()){}
 		}
 		else
 		{
@@ -69,7 +80,7 @@ class Miney : ISelectable
 	
 	public void handleWrite()
 	{
-		Stdout.formatln("sending {} bytes", _outBuffer.drain(_socket));
+		_outBuffer.drain(_socket);
 		updateWrite();
 	}
 	
@@ -81,37 +92,24 @@ class Miney : ISelectable
 	
 	private void handlePacket(Receivable r)
 	{
-		Stdout.format("getting {}", packetID2Name(r.packetID));
 		switch(r.packetID)
 		{
-			case PacketID.Login:
-				Login l = cast(Login)r;
-				Stdout.formatln(": EID: {} MapSeed: {} Dimension: {}", l.EID, l.mapSeed, l.dimension);
-				break;
 			case PacketID.Handshake:
-				Handshake h = cast(Handshake)r;
-				Stdout.formatln(": ConnectionHash: {}", h.connectionHash);
-				_hasHandshake = true;
 				Login l = new Login("Ligustah", "Password");
 				queue(l);
 				break;
-			case PacketID.MapChunk:
-				MapChunk m = cast(MapChunk)r;
-				Stdout.formatln(": #{} {}", chunks++, m.size);
-				break;
-			case PacketID.PreChunk:
-				PreChunk p = cast(PreChunk)r;
-				Stdout.formatln(": {}/{}", p.x, p.y);
-				break;
 			default:
-				Stdout().newline;
 				break;
 		}
+		
+		auto slot = lookupCT!("miney.onPacket")(_mainThread);
+		pushNull(_mainThread);
+		superPush!(Receivable)(_mainThread, r);
+		rawCall(_mainThread, slot, 0);
 	}
 	
 	public void queue(Sendable s)
 	{
-		Stdout.formatln("queuing {}", packetID2Name(s.packetID));
 		_output | s;
 	}
 	
@@ -129,8 +127,14 @@ class Miney : ISelectable
 		
 		if(_inBuffer.readable < _packet.minSize)
 			return false;	// not enough data to parse
-		
-		_packet.receive(_input);
+		try
+		{
+			_packet.receive(_input);
+		}catch(IOException ioe)
+		{
+			_inBuffer.skip(1-_inBuffer.position);
+			return false;
+		}
 		
 		handlePacket(_packet);
 		_packet = null;
@@ -154,6 +158,11 @@ class Miney : ISelectable
 	public void update()
 	{
 		//add other update routines here
+		if(Clock.now - _lastKeepAlive >= TimeSpan.fromSeconds(30))
+		{
+			queue(new KeepAlive());
+			_lastKeepAlive = Clock.now;
+		}
 		
 		
 		updateWrite();
@@ -162,27 +171,18 @@ class Miney : ISelectable
 
 void main()
 {
-	Network n = new Network();
-	Miney m = new Miney("localhost", 25565, n);
-	
-	m.test();
-	n.run();
-	
-	
-	/*
 	MDVM vm;
 	
 	auto t = openVM(&vm);
 	loadStdlibs(t, MDStdlib.All);
+	initMineyVM(&vm);
 	
-	runFile(t, "miney.md");
+	importModule(t, "miney");
+	//newGlobal(t, "miney");
 	
-	return;
+	Network n = new Network();
+	Miney m = new Miney("localhost", 25565, n, &vm);
 	
-	auto s = new Selector();
-	s.open;
-	
-	Socket sock = new Socket();
-	sock.connect("Andre-PC", 25565);
-	*/
+	m.test();
+	n.run();
 }
