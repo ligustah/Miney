@@ -1,21 +1,21 @@
 module protocol;
 
-import tango.io.stream.Data;
-import tango.io.device.Conduit;
-
 import tango.core.Traits;
 
 import tango.io.Stdout;
 
+import network;
+import util;
+
+
 static const int ProtocolVersion = 9;
 
-static char[] moduleName = __FILE__;
+static char[] moduleName = __FILE__[0..$-2];
 
 static ClassInfo[PacketID] PacketHandlers;
 
 static this()
 {
-	moduleName = moduleName[0..$-2];
 	foreach(mod; ModuleInfo)
 	{
 		if(mod.name == moduleName)
@@ -46,6 +46,22 @@ static bool implements(ClassInfo ci, ClassInfo interfac)
 	return false;
 }
 
+static char[] packetID2Name(ubyte id)
+{
+	return getHandler(id).name;
+}
+
+static ClassInfo getHandler(ubyte id)
+{
+	ClassInfo* info = (cast(PacketID)id) in PacketHandlers;
+	
+	if(info)
+	{
+		return *info;
+	}
+	return null;
+}
+
 static void addHandler(ClassInfo ci)
 {
 	if(!implements(ci, Receivable.classinfo))
@@ -61,11 +77,6 @@ static void addHandler(ClassInfo ci)
 	{
 		assert(false, "invalid handler " ~ ci.name);
 	}
-}
-
-template _getter(char[] name)
-{
-	const char[] _getter = "public typeof(_" ~ name ~ ") " ~ name ~ "(){ return _" ~ name ~ ";}";
 }
 
 template _minSize(size_t i)
@@ -223,248 +234,6 @@ enum InventoryType : byte
 	Dispenser = 0x03
 }
 
-public bool variableLength(PacketID type)
-{
-	switch(type)
-	{
-		case PacketID.Login:
-		case PacketID.Handshake:
-		case PacketID.Chat:
-		case PacketID.PlayerBlockPlacement:
-		case PacketID.NamedEntitySpawn:
-		case PacketID.MobSpawn:
-		case PacketID.EntityPainting:
-		case PacketID.EntityMetadata:
-		case PacketID.MapChunk:
-		case PacketID.MultiBlockChange:
-		case PacketID.Explosion:
-		case PacketID.WindowClick:
-		case PacketID.SetSlot:
-		case PacketID.WindowItems:
-		case PacketID.UpdateSign:
-		case PacketID.Disconnect:
-			return true;
-	}
-	
-	return false;
-}
-
-class MinecraftDataOutput : DataOutput
-{
-	this(OutputStream outs)
-	{
-		super(outs);
-		endian(Network);
-	}
-	
-	public alias string putString;
-	
-	public size_t string(char[] str)
-	{
-		int16(str.length);
-		return write(str);
-	}
-	
-	public typeof(this) put(char[] str)
-	{
-		string(str);
-		
-		return this;
-	}
-	
-	public typeof(this) put(bool b)
-	{
-		putBool(b);
-		
-		return this;
-	}
-	
-	public typeof(this) put(int i)
-	{
-		putInt(i);
-		
-		return this;
-	}
-	
-	public typeof(this) put(long l)
-	{
-		putLong(l);
-		
-		return this;
-	}
-	
-	public typeof(this) put(short s)
-	{
-		putShort(s);
-		
-		return this;
-	}
-	
-	public typeof(this) put(float f)
-	{
-		putFloat(f);
-		
-		return this;
-	}
-	
-	public typeof(this) put(double d)
-	{
-		putFloat(d);
-		
-		return this;
-	}
-	
-	public typeof(this) put(byte b)
-	{
-		putByte(b);
-		
-		return this;
-	}
-	
-	public typeof(this) put(PacketID id)
-	{
-		putByte(id);
-		
-		return this;
-	}
-	
-	public alias put opOr;
-}
-
-class MinecraftDataInput : DataInput
-{
-	this(InputStream ins)
-	{
-		super(ins);
-		endian(Network);
-	}
-	
-	public alias string getString;
-	
-	public char[] string()
-	{
-		short len = int16;
-		Stdout.formatln("attempting to read {} chars", len);
-		char[] str = new char[len];
-		read(cast(void[])str);
-		
-		return str;
-	}
-	
-	public typeof(this) get(out char[] str)
-	{
-		str = string();
-		
-		return this;
-	}
-	
-	public typeof(this) get(out bool b)
-	{
-		b = getBool();
-		
-		return this;
-	}
-	
-	public typeof(this) get(out int i)
-	{
-		i = getInt();
-		
-		return this;
-	}
-	
-	public typeof(this) get(out long l)
-	{
-		l = getLong();
-		
-		return this;
-	}
-	
-	public typeof(this) get(out byte b)
-	{
-		b = getByte();
-		
-		return this;
-	}
-	
-	public typeof(this) get(out short s)
-	{
-		s = getShort();
-		
-		return this;
-	}
-	
-	public typeof(this) get(out float f)
-	{
-		f = getFloat();
-		
-		return this;
-	}
-	
-	public typeof(this) get(out double d)
-	{
-		d = getDouble();
-		
-		return this;
-	}
-	
-	public alias get opOr;
-	
-	public void metadata()
-	{
-		byte x;
-		int n = 0;
-		
-		while(true)
-		{
-			this|x;
-			
-			if(x == 0x7F)
-				break;
-				
-			Stdout.format("{}: ", n++);
-				
-			byte y = x >> 5;
-			
-			switch(y)
-			{
-				case 0:
-					Stdout.formatln("{}", getByte);
-					break;
-				case 1:
-					Stdout.formatln("{}", getShort);
-					break;
-				case 2:
-					Stdout.formatln("{}", getInt);
-					break;
-				case 3:
-					Stdout.formatln("{}", getFloat);
-					break;
-				case 4:
-					Stdout.formatln("{}", getString);
-					break;
-				case 5:
-					Stdout.formatln("{} {} {}", getShort, getByte, getShort);
-					break;
-				default:
-					assert(0, "invalid metadata");
-			}
-		}
-	}
-}
-
-interface Sendable
-{
-	public void send(MinecraftDataOutput);
-	public PacketID packetID();
-}
-
-interface Receivable
-{
-	public PacketID packetID();
-	public size_t minSize();
-	public int receive(MinecraftDataInput);
-}
-
 class KeepAlive : Receivable, Sendable
 {	
 	mixin(_packetID!("KeepAlive"));
@@ -477,8 +246,7 @@ class KeepAlive : Receivable, Sendable
 	
 	public void send(MinecraftDataOutput output)
 	{
-		output
-		|packetID;
+		//nothing to do here
 	}
 	
 	public this()
@@ -500,12 +268,8 @@ class Login : Sendable, Receivable
 	private char[] _password;
 	private long _mapSeed;
 	private byte _dimension;
-	
-	mixin(_getter!("EID"));
-	mixin(_getter!("username"));
-	mixin(_getter!("password"));
-	mixin(_getter!("mapSeed"));
-	mixin(_getter!("dimension"));
+		
+	mixin(_getter!("EID", "username", "password", "mapSeed", "dimension"));
 	
 	public this(char[] username, char[] password)
 	{
@@ -534,12 +298,12 @@ class Login : Sendable, Receivable
 	public void send(MinecraftDataOutput output)
 	{
 		output
-		|packetID
 		|_protocolVersion
 		|_username
-		|_password
-		|0	//map seed
-		|0;	//dimension
+		|_password;
+		
+		output.putLong(0);
+		output.putByte(0);
 	}
 }
 
@@ -554,8 +318,7 @@ class Handshake : Sendable, Receivable
 		private char[] _connectionHash;
 	}
 	
-	mixin(_getter!("username"));
-	mixin(_getter!("connectionHash"));
+	mixin(_getter!("username", "connectionHash"));
 	
 	public static const char[] AUTH_NONE = "-";
 	public static const char[] AUTH_PASSWORD = "+";
@@ -572,7 +335,6 @@ class Handshake : Sendable, Receivable
 	public void send(MinecraftDataOutput output)
 	{
 		output
-		|packetID
 		|_username;
 	}
 	
@@ -615,7 +377,6 @@ class Chat : Sendable, Receivable
 	public void send(MinecraftDataOutput output)
 	{
 		output
-		|packetID
 		|_message;
 	}
 }
@@ -640,6 +401,33 @@ class TimeUpdate : Receivable
 		
 		return minSize;
 	}
+}
+
+class EntityEquipment : Receivable
+{
+	mixin(_minSize!(11));
+	mixin(_packetID!("EntityEquipment"));
+	
+	private int _EID;
+	private short _slot, _itemID, _damage;
+	
+	mixin(_getter!("EID", "slot", "itemID", "damage"));
+	
+	public this()
+	{
+	}
+	
+	public int receive(MinecraftDataInput input)
+	{
+		input
+		|_EID
+		|_slot
+		|_itemID
+		|_damage;
+		
+		return minSize;
+	}
+	
 }
 
 class SpawnPosition : Receivable
@@ -700,7 +488,6 @@ class UseEntity : Sendable, Receivable
 	public void send(MinecraftDataOutput output)
 	{
 		output
-		|packetID
 		|_user
 		|_target
 		|_leftClick;
@@ -737,7 +524,7 @@ class Respawn : Sendable, Receivable
 	
 	public void send(MinecraftDataOutput output)
 	{
-		output.putByte(packetID);
+		// nothing to do here
 	}
 }
 
@@ -754,8 +541,7 @@ class Player : Sendable
 	
 	public void send(MinecraftDataOutput output)
 	{
-		output
-		|packetID
+		output	
 		|_onGround;
 	}
 }
@@ -780,7 +566,6 @@ class PlayerPosition : Sendable
 	public void send(MinecraftDataOutput output)
 	{
 		output
-		|packetID
 		|_x
 		|_y
 		|_stance
@@ -806,7 +591,6 @@ class PlayerLook : Sendable
 	public void send(MinecraftDataOutput output)
 	{
 		output
-		|packetID
 		|_yaw
 		|_pitch
 		|_onGround;
@@ -848,7 +632,6 @@ class PlayerPositionLook : Sendable, Receivable
 	public void send(MinecraftDataOutput output)
 	{
 		output
-		|packetID
 		|_x
 		|_stance
 		|_y
@@ -900,7 +683,6 @@ class PlayerDigging : Sendable
 	public void send(MinecraftDataOutput output)
 	{
 		output
-		|packetID
 		|_status
 		|_x
 		|_y
@@ -964,7 +746,6 @@ class PlayerBlockPlacement : Sendable, Receivable
 	public void send(MinecraftDataOutput output)
 	{
 		output
-		|packetID
 		|_x
 		|_y
 		|z
@@ -993,7 +774,6 @@ class HoldingChange : Sendable
 	public void send(MinecraftDataOutput output)
 	{
 		output
-		|packetID
 		|_slotID;
 	}
 }
@@ -1058,7 +838,6 @@ class Animation : Sendable, Receivable
 	public void send(MinecraftDataOutput output)
 	{
 		output
-		|packetID
 		|_EID
 		|_animate;
 	}
@@ -1088,7 +867,6 @@ class EntityAction : Receivable, Sendable
 	public void send(MinecraftDataOutput output)
 	{
 		output
-		|packetID
 		|_EID
 		|_action;
 	}
@@ -1651,7 +1429,7 @@ class MapChunk : Receivable
 	mixin(_getter!("sizeX"));
 	mixin(_getter!("sizeY"));
 	mixin(_getter!("sizeZ"));
-	mixin(_getter!("data"));
+	mixin(_getter!("data", "size"));
 	
 	public this()
 	{
@@ -1882,7 +1660,6 @@ class CloseWindow : Receivable, Sendable
 	public void send(MinecraftDataOutput output)
 	{
 		output
-		|packetID
 		|_id;
 	}
 }
@@ -1909,7 +1686,6 @@ class WindowClick : Sendable
 	public void send(MinecraftDataOutput output)
 	{
 		output
-		|packetID
 		|_id
 		|_slot
 		|_rightClick
@@ -2122,7 +1898,6 @@ class Disconnect : Receivable, Sendable
 	public void send(MinecraftDataOutput output)
 	{
 		output
-		|packetID
 		|_reason;
 	}
 	
