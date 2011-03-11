@@ -4,7 +4,7 @@ import io
 import string
 import all
 
-local file = io.outFile("handler.d")
+//local file = io.outFile("handler.d")
 
 local h = []
 
