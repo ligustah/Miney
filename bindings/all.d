@@ -6,7 +6,7 @@ import minid.bind;
 import bindings.enums;
 import bindings.classes;
 
-import protocol;
+import miney.protocol;
 
 void initMineyVM(MDVM* vm)
 {

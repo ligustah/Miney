@@ -1,16 +1,16 @@
-module protocol;
+module miney.protocol;
 
 import tango.core.Traits;
 
 import tango.io.Stdout;
 
-import network;
-import util;
+import miney.network;
+import miney.util;
 
 
 static const int ProtocolVersion = 9;
 
-static char[] moduleName = __FILE__[0..$-2];
+static char[] moduleName = "miney.protocol";
 
 static ClassInfo[PacketID] PacketHandlers;
 

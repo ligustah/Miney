@@ -2,7 +2,7 @@
 module bindings.enums;
 import minid.api;
 import minid.bind;
-import protocol;
+import miney.protocol;
 void initMineyEnums(MDVM* vm)
 {
 	MDThread* t = mainThread(vm);

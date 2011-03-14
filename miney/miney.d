@@ -1,4 +1,4 @@
-module miney;
+module miney.miney;
 
 import minid.api;
 import minid.bind;
@@ -19,9 +19,9 @@ import tango.core.Thread;
 import tango.core.Memory;
 import tango.core.Exception;
 
-import protocol;
-import network;
-import util;
+import miney.protocol;
+import miney.network;
+import miney.util;
 import bindings.all;
 
 class Miney : ISelectable
@@ -250,6 +250,14 @@ void main()
 		)
 	)(t);
 	
+	//importModule(t, "miney");
+	char[] path = getString(t, lookupCT!("modules.path")(t));
+	path ~= ";scripts";
+	
+	pushGlobal(t, "modules");
+	pushString(t, path);
+	fielda(t, -2, "path");
+	pop(t);
 	importModule(t, "miney");
 	//newGlobal(t, "miney");
 	

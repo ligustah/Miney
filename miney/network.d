@@ -1,4 +1,4 @@
-module network;
+module miney.network;
 
 import tango.io.selector.Selector;
 import tango.io.stream.Data;
@@ -11,8 +11,8 @@ import tango.core.Tuple;
 
 import tango.util.container.LinkedList;
 
-import miney;
-import protocol;
+import miney.miney;
+import miney.protocol;
 
 class Network
 {

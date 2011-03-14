@@ -53,8 +53,8 @@ module bindings.classes;
 import minid.bind;
 import minid.api;
 
-import protocol;
-import network;
+import miney.protocol;
+import miney.network;
 
 void initMineyClasses(MDVM* vm)
 {

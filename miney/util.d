@@ -1,4 +1,4 @@
-module util;
+module miney.util;
 
 /**
 	mixin this to add a set of getter-methods to a class,
