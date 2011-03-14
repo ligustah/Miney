@@ -54,6 +54,7 @@ import minid.bind;
 import minid.api;
 
 import protocol;
+import network;
 
 void initMineyClasses(MDVM* vm)
 {

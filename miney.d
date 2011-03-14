@@ -16,6 +16,7 @@ import tango.time.Clock;
 import Integer = tango.text.convert.Integer;
 
 import tango.core.Thread;
+import tango.core.Memory;
 import tango.core.Exception;
 
 import protocol;
@@ -37,10 +38,17 @@ class Miney : ISelectable
 	private bool					_hasHandshake = false;
 	private bool					_socketClosed = false;
 	private Time					_lastKeepAlive;
+	private Time					_lastUpdate;
 	private int chunks = 0;
 	
 	private MDVM*					_vm;
 	private MDThread*				_mainThread;
+	private int						_update;
+	
+	this()
+	{
+		assert(false, "no no no");
+	}
 	
 	this(char[] host, ushort port, Network n, MDVM* vm)
 	{
@@ -49,7 +57,7 @@ class Miney : ISelectable
 		this._network = n;
 		this._socket = new Socket();
 		this._inBuffer = new Bin(_socket, 4096);
-		this._outBuffer = new Bout(_socket, 1024);
+		this._outBuffer = new Bout(_socket, 4096);
 		this._input = new MinecraftDataInput(_inBuffer);
 		this._output = new MinecraftDataOutput(_outBuffer);
 		this._vm = vm;
@@ -58,6 +66,34 @@ class Miney : ISelectable
 		_socket.native.blocking = false;
 		_socket.connect(_host, _port);
 		n.addBot(this);
+		initAPI();
+	}
+	
+	static uint miney_send(MDThread* t)
+	{
+		Miney m = superGet!(Miney)(t, getUpval(t, 0));
+		auto numParams = stackSize(t) - 1;
+		
+		for(int i = 1; i < numParams; i++)
+		{
+			Sendable s = superGet!(Sendable)(t, i);
+			if(s is null)
+				continue;
+			m.queue(cast(Sendable)s);
+		}
+		
+		return 0;
+	}
+	
+	private void initAPI()
+	{
+		MDThread* t = _mainThread;
+		
+		superPush!(Miney)(t, this);
+		newFunction(t, &miney_send, "send", 1);
+		newGlobal(t, "send");
+		
+		_update = lookup(_mainThread, "miney.update");
 	}
 	
 	Handle fileHandle()
@@ -80,7 +116,14 @@ class Miney : ISelectable
 	
 	public void handleWrite()
 	{
-		_outBuffer.drain(_socket);
+		try
+		{
+			_outBuffer.flush;//(_socket);
+		}catch(Exception ioe)
+		{
+			Stdout.formatln("exception: {}", ioe);
+			//need to wait for next turn
+		}
 		updateWrite();
 	}
 	
@@ -110,7 +153,14 @@ class Miney : ISelectable
 	
 	public void queue(Sendable s)
 	{
-		_output | s;
+		//Stdout("queuing packet").newline;
+		try
+		{
+			_output | s;
+		}catch(Exception e)
+		{
+			Stdout.formatln("exception in queue: {} {}", e, _outBuffer.limit);
+		}
 	}
 	
 	private bool parse()
@@ -147,23 +197,39 @@ class Miney : ISelectable
 	{
 		if(_outBuffer.limit > 0)
 		{
+			//Stdout("want write").newline;
 			_network.registerBot(this, Event.Read | Event.Write);
 		}
 		else
 		{
+			//Stdout("nothing to send").newline;
 			_network.registerBot(this, Event.Read);
 		}
 	}
 	
 	public void update()
 	{
+		Time now = Clock.now;
+		
 		//add other update routines here
-		if(Clock.now - _lastKeepAlive >= TimeSpan.fromSeconds(30))
+		if(now - _lastKeepAlive >= TimeSpan.fromSeconds(30))
 		{
 			queue(new KeepAlive());
-			_lastKeepAlive = Clock.now;
+			_lastKeepAlive = now;
+			gc(_mainThread);
+			GC.collect();
+			//GC.minimize();
+			Stdout.formatln("bytes allocated: {} stack size: {}", bytesAllocated(_vm), stackSize(_mainThread));
 		}
 		
+		if(now - _lastUpdate >= TimeSpan.fromMillis(50))
+		{
+			auto slot = dup(_mainThread, _update);
+			pushNull(_mainThread);
+			rawCall(_mainThread, slot, 0);
+			_lastUpdate = now;
+		}
+	
 		
 		updateWrite();
 	}
@@ -176,6 +242,13 @@ void main()
 	auto t = openVM(&vm);
 	loadStdlibs(t, MDStdlib.All);
 	initMineyVM(&vm);
+	WrapGlobals!(
+		WrapType!(
+			Miney,
+			"_miney_",
+			WrapMethod!(Miney.queue)
+		)
+	)(t);
 	
 	importModule(t, "miney");
 	//newGlobal(t, "miney");

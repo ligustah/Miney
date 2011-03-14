@@ -3,11 +3,18 @@ module bindings.classes;
 import minid.bind;
 import minid.api;
 import protocol;
+import network;
 void initMineyClasses(MDVM* vm)
 {
 	MDThread* t = mainThread(vm);
 	
 	WrapGlobals!(
+		WrapType!(
+			Sendable,
+			"Sendable",
+			
+			WrapProperty!(Sendable.packetID)
+		),
 		WrapType!(
 			KeepAlive,
 			"KeepAlive",
@@ -15,16 +22,10 @@ void initMineyClasses(MDVM* vm)
 			WrapProperty!(KeepAlive.packetID)
 		),
 		WrapType!(
-			Chat,
-			"Chat",
-			WrapCtors!(void function(char[])),
-			WrapProperty!(Chat.message), WrapProperty!(Chat.packetID)
-		),
-		WrapType!(
-			EntityAction,
-			"EntityAction",
-			WrapCtors!(void function(int, byte)),
-			WrapProperty!(EntityAction.EID), WrapProperty!(EntityAction.action), WrapProperty!(EntityAction.packetID)
+			PlayerDigging,
+			"PlayerDigging",
+			WrapCtors!(void function(byte, int, byte, int, byte)),
+			WrapProperty!(PlayerDigging.packetID)
 		),
 		WrapType!(
 			UpdateHealth,
@@ -33,10 +34,10 @@ void initMineyClasses(MDVM* vm)
 			WrapProperty!(UpdateHealth.health), WrapProperty!(UpdateHealth.packetID)
 		),
 		WrapType!(
-			EntityPainting,
-			"EntityPainting",
-			
-			WrapProperty!(EntityPainting.EID), WrapProperty!(EntityPainting.x), WrapProperty!(EntityPainting.y), WrapProperty!(EntityPainting.z), WrapProperty!(EntityPainting.type), WrapProperty!(EntityPainting.title), WrapProperty!(EntityPainting.packetID)
+			EntityAction,
+			"EntityAction",
+			WrapCtors!(void function(int, byte)),
+			WrapProperty!(EntityAction.EID), WrapProperty!(EntityAction.action), WrapProperty!(EntityAction.packetID)
 		),
 		WrapType!(
 			PickupSpawn,
@@ -57,10 +58,10 @@ void initMineyClasses(MDVM* vm)
 			WrapProperty!(SpawnPosition.x), WrapProperty!(SpawnPosition.y), WrapProperty!(SpawnPosition.z), WrapProperty!(SpawnPosition.packetID)
 		),
 		WrapType!(
-			DestroyEntity,
-			"DestroyEntity",
+			EntityVelocity,
+			"EntityVelocity",
 			
-			WrapProperty!(DestroyEntity.EID), WrapProperty!(DestroyEntity.packetID)
+			WrapProperty!(EntityVelocity.EID), WrapProperty!(EntityVelocity.x), WrapProperty!(EntityVelocity.y), WrapProperty!(EntityVelocity.z), WrapProperty!(EntityVelocity.packetID)
 		),
 		WrapType!(
 			PreChunk,
@@ -75,10 +76,10 @@ void initMineyClasses(MDVM* vm)
 			WrapProperty!(Transaction.id), WrapProperty!(Transaction.transactionID), WrapProperty!(Transaction.accepted), WrapProperty!(Transaction.packetID)
 		),
 		WrapType!(
-			Respawn,
-			"Respawn",
+			EntityPainting,
+			"EntityPainting",
 			
-			WrapProperty!(Respawn.packetID)
+			WrapProperty!(EntityPainting.EID), WrapProperty!(EntityPainting.x), WrapProperty!(EntityPainting.y), WrapProperty!(EntityPainting.z), WrapProperty!(EntityPainting.type), WrapProperty!(EntityPainting.title), WrapProperty!(EntityPainting.packetID)
 		),
 		WrapType!(
 			NamedEntitySpawn,
@@ -99,6 +100,12 @@ void initMineyClasses(MDVM* vm)
 			WrapProperty!(Handshake.username), WrapProperty!(Handshake.connectionHash), WrapProperty!(Handshake.packetID)
 		),
 		WrapType!(
+			Respawn,
+			"Respawn",
+			
+			WrapProperty!(Respawn.packetID)
+		),
+		WrapType!(
 			EntityLookRelativeMove,
 			"EntityLookRelativeMove",
 			
@@ -111,16 +118,16 @@ void initMineyClasses(MDVM* vm)
 			WrapProperty!(EntityTeleport.EID), WrapProperty!(EntityTeleport.x), WrapProperty!(EntityTeleport.y), WrapProperty!(EntityTeleport.z), WrapProperty!(EntityTeleport.yaw), WrapProperty!(EntityTeleport.pitch), WrapProperty!(EntityTeleport.packetID)
 		),
 		WrapType!(
-			EntityStatus,
-			"EntityStatus",
-			
-			WrapProperty!(EntityStatus.EID), WrapProperty!(EntityStatus.status), WrapProperty!(EntityStatus.packetID)
-		),
-		WrapType!(
 			EntityRelativeMove,
 			"EntityRelativeMove",
 			
 			WrapProperty!(EntityRelativeMove.EID), WrapProperty!(EntityRelativeMove.dX), WrapProperty!(EntityRelativeMove.dY), WrapProperty!(EntityRelativeMove.dZ), WrapProperty!(EntityRelativeMove.packetID)
+		),
+		WrapType!(
+			EntityStatus,
+			"EntityStatus",
+			
+			WrapProperty!(EntityStatus.EID), WrapProperty!(EntityStatus.status), WrapProperty!(EntityStatus.packetID)
 		),
 		WrapType!(
 			AttachEntity,
@@ -135,16 +142,16 @@ void initMineyClasses(MDVM* vm)
 			WrapProperty!(EntityMetadata.EID), WrapProperty!(EntityMetadata.packetID)
 		),
 		WrapType!(
-			Entity,
-			"Entity",
-			
-			WrapProperty!(Entity.EID), WrapProperty!(Entity.packetID)
-		),
-		WrapType!(
 			EntityLook,
 			"EntityLook",
 			
 			WrapProperty!(EntityLook.EID), WrapProperty!(EntityLook.yaw), WrapProperty!(EntityLook.pitch), WrapProperty!(EntityLook.packetID)
+		),
+		WrapType!(
+			DestroyEntity,
+			"DestroyEntity",
+			
+			WrapProperty!(DestroyEntity.EID), WrapProperty!(DestroyEntity.packetID)
 		),
 		WrapType!(
 			MultiBlockChange,
@@ -165,12 +172,6 @@ void initMineyClasses(MDVM* vm)
 			WrapProperty!(CloseWindow.id), WrapProperty!(CloseWindow.packetID)
 		),
 		WrapType!(
-			WindowItems,
-			"WindowItems",
-			
-			WrapProperty!(WindowItems.id), WrapProperty!(WindowItems.count), WrapProperty!(WindowItems.items), WrapProperty!(WindowItems.packetID)
-		),
-		WrapType!(
 			TimeUpdate,
 			"TimeUpdate",
 			
@@ -189,16 +190,16 @@ void initMineyClasses(MDVM* vm)
 			WrapProperty!(OpenWindow.id), WrapProperty!(OpenWindow.type), WrapProperty!(OpenWindow.slots), WrapProperty!(OpenWindow.title), WrapProperty!(OpenWindow.packetID)
 		),
 		WrapType!(
-			UpdateProgress,
-			"UpdateProgress",
+			WindowItems,
+			"WindowItems",
 			
-			WrapProperty!(UpdateProgress.id), WrapProperty!(UpdateProgress.bar), WrapProperty!(UpdateProgress.value), WrapProperty!(UpdateProgress.packetID)
+			WrapProperty!(WindowItems.id), WrapProperty!(WindowItems.count), WrapProperty!(WindowItems.items), WrapProperty!(WindowItems.packetID)
 		),
 		WrapType!(
-			PlayerDigging,
-			"PlayerDigging",
-			WrapCtors!(void function(byte, int, byte, int, byte)),
-			WrapProperty!(PlayerDigging.packetID)
+			Chat,
+			"Chat",
+			WrapCtors!(void function(char[])),
+			WrapProperty!(Chat.message), WrapProperty!(Chat.packetID)
 		),
 		WrapType!(
 			MapChunk,
@@ -213,10 +214,10 @@ void initMineyClasses(MDVM* vm)
 			WrapProperty!(PlayNoteBlock.x), WrapProperty!(PlayNoteBlock.y), WrapProperty!(PlayNoteBlock.z), WrapProperty!(PlayNoteBlock.type), WrapProperty!(PlayNoteBlock.pitch), WrapProperty!(PlayNoteBlock.packetID)
 		),
 		WrapType!(
-			EntityVelocity,
-			"EntityVelocity",
+			UpdateProgress,
+			"UpdateProgress",
 			
-			WrapProperty!(EntityVelocity.EID), WrapProperty!(EntityVelocity.x), WrapProperty!(EntityVelocity.y), WrapProperty!(EntityVelocity.z), WrapProperty!(EntityVelocity.packetID)
+			WrapProperty!(UpdateProgress.id), WrapProperty!(UpdateProgress.bar), WrapProperty!(UpdateProgress.value), WrapProperty!(UpdateProgress.packetID)
 		),
 		WrapType!(
 			HoldingChange,
@@ -235,6 +236,12 @@ void initMineyClasses(MDVM* vm)
 			"SetSlot",
 			
 			WrapProperty!(SetSlot.id), WrapProperty!(SetSlot.count), WrapProperty!(SetSlot.slot), WrapProperty!(SetSlot.itemID), WrapProperty!(SetSlot.uses), WrapProperty!(SetSlot.packetID)
+		),
+		WrapType!(
+			Entity,
+			"Entity",
+			
+			WrapProperty!(Entity.EID), WrapProperty!(Entity.packetID)
 		),
 		WrapType!(
 			WindowClick,
@@ -311,7 +318,7 @@ void initMineyClasses(MDVM* vm)
 		WrapType!(
 			PlayerPositionLook,
 			"PlayerPositionLook",
-			
+			WrapCtors!(void function(double, double, double, double, float, float, bool)),
 			WrapProperty!(PlayerPositionLook.x), WrapProperty!(PlayerPositionLook.y), WrapProperty!(PlayerPositionLook.z), WrapProperty!(PlayerPositionLook.stance), WrapProperty!(PlayerPositionLook.yaw), WrapProperty!(PlayerPositionLook.pitch), WrapProperty!(PlayerPositionLook.onGround), WrapProperty!(PlayerPositionLook.packetID)
 		),
 		WrapType!(

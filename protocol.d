@@ -240,7 +240,7 @@ enum AuthCode
 	Password = "+"
 }
 */
-class KeepAlive : Receivable, Sendable
+class KeepAlive : Sendable, Receivable
 {	
 	mixin(_packetID!("KeepAlive"));
 	mixin(_minSize!(1));
@@ -846,7 +846,7 @@ class Animation : Sendable, Receivable
 	}
 }
 
-class EntityAction : Receivable, Sendable
+class EntityAction : Sendable, Receivable
 {
 	mixin(_minSize!(6));
 	mixin(_packetID!("EntityAction"));
@@ -1634,7 +1634,7 @@ class OpenWindow : Receivable
 	}
 }
 
-class CloseWindow : Receivable, Sendable
+class CloseWindow : Sendable, Receivable
 {
 	mixin(_packetID!("CloseWindow"));
 	mixin(_minSize!(2));
@@ -1880,7 +1880,7 @@ class UpdateSign : Receivable
 	}
 }
 
-class Disconnect : Receivable, Sendable
+class Disconnect : Sendable, Receivable
 {
 	mixin(_packetID!("Disconnect"));
 	mixin(_minSize!(3));

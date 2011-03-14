@@ -315,10 +315,25 @@ class MinecraftDataInput : DataInput
 	}
 }
 
+/*
 interface Sendable
 {
 	public void send(MinecraftDataOutput);
 	public PacketID packetID();
+}*/
+
+class Sendable
+{
+	public void send(MinecraftDataOutput output)
+	{
+		assert(false, "no no no");
+	}
+	
+	public PacketID packetID()
+	{
+		assert(false, "no no no");
+		return PacketID.Login;
+	}
 }
 
 interface Receivable

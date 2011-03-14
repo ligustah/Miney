@@ -2,6 +2,9 @@ module all
 
 global classes = 
 {
+	Sendable =
+	{
+	}
 	KeepAlive = 
 	{
 		
@@ -61,6 +64,7 @@ global classes =
 	PlayerPositionLook =
 	{
 		properties = ["x", "y", "z", "stance", "yaw", "pitch", "onGround"]
+		constructor = ["double", "double", "double", "double", "float", "float", "bool"]
 	}
 	DropItem =
 	{
