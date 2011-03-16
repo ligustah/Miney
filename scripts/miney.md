@@ -1,6 +1,12 @@
 module miney
 
 import mineyStrings
+import math
+
+local function distance(p1, p2)
+{
+	return math.sqrt(math.pow(p1.x - p2.x, 2) + math.pow(p1.y - p2.y, 2) + math.pow(p1.z - p2.z, 2))
+}
 
 global mobs = {}
 local lastAttack = 0
@@ -26,8 +32,84 @@ local function onEntity(packet)
 	}
 }
 
+local function printPosition(pos, fmt = "")
+{
+	writefln $ "{} {}/{}/{}", fmt, pos.x, pos.y, pos.z
+}
+
+local function attackMobs()
+{
+	foreach(eid, mob; mobs)
+	{
+		local dis = distance(position, mob)
+		
+		if(dis <= 4)
+		{
+			writefln $ "mob distance {}", dis
+			send(UseEntity(0, eid, true))
+		}
+	}
+}
+
+local function handleMob(p)
+{
+	local EID
+	try
+	{
+		EID = p.EID
+	}catch(e){ return }
+	
+	if(EID !in mobs)
+	{
+		if(p.packetID == PacketID.MobSpawn)
+		{
+			mobs[EID] = { }
+			local mob = mobs[EID]
+			writefln $ "MobSpawn EID: {} type: {} at {}/{}/{}", EID, MobType.toString(p.type), p.x, p.y, p.z
+			mob.x = p.x
+			mob.y = p.y
+			mob.z = p.z
+			mob.yaw = p.yaw
+			mob.pitch = p.pitch
+			mob.type = p.type
+		}
+		return
+	}
+	
+	local mob = mobs[EID]
+	
+	if(		p.packetID == PacketID.EntityRelativeMove
+		||	p.packetID == PacketID.EntityLookRelativeMove )
+	{
+		mob.x += p.dX / 32.0
+		mob.y += p.dY / 32.0
+		mob.z += p.dZ / 32.0
+	}
+	
+	if(		p.packetID == PacketID.EntityLook
+		||	p.packetID == PacketID.EntityLookRelativeMove )
+	{
+			mob.yaw = p.yaw
+			mob.pitch = p.pitch
+	}
+}
+
+global function onConnect(host, port)
+{
+	writefln $ "connected!!! ({}:{})", host, port
+	local t = 0
+	
+	setTimer(1000, attackMobs)
+}
+
+global function onDisconnect()
+{
+	writeln $ "disconnected :("
+}
+
 global function onPacket(packet)
 {
+	handleMob(packet)
 	switch(packet.packetID)
 	{
 		case PacketID.Login:
@@ -36,16 +118,12 @@ global function onPacket(packet)
 		case PacketID.Handshake:
 			writeln $ "received handshake"
 			break;
-		case PacketID.MobSpawn:
-			writefln $ "MobSpawn EID: {} type: {}", packet.EID, MobType.toString(packet.type)
-			mobs[packet.EID] = packet.type
-			break;
 		case PacketID.EntityMetadata:
 			writefln $ "updating {}", packet.EID
 		case PacketID.DestroyEntity:
 			if(packet.EID in mobs)
 			{
-				writefln $ "{} {} died", MobType.toString(mobs[packet.EID]), packet.EID
+				writefln $ "{} {} died", MobType.toString(mobs[packet.EID].type), packet.EID
 				mobs[packet.EID] = null
 			}
 			break
@@ -72,27 +150,5 @@ local factor = 0.01
 
 global function update()
 {
-	if(position.valid)
-	{
-		//position.onGround = true
-		position.x += factor * counter
-		counter += factor
-		
-		if(counter >= 20 || counter <= 0)
-		{
-			factor *= -1
-		}
-	}
 	position.update()
-	
-	if(time.microTime() - lastAttack > 1_000_000)
-	{
-		//writeln $ "attack!"
-		foreach(eid, type; mobs)
-		{
-			send(UseEntity(0, eid, true))
-		}
-		
-		lastAttack = time.microTime()
-	}	
 }

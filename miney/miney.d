@@ -20,6 +20,7 @@ import tango.core.Memory;
 import tango.core.Exception;
 
 import miney.protocol;
+import miney.timer;
 import miney.network;
 import miney.util;
 import bindings.all;
@@ -39,11 +40,18 @@ class Miney : ISelectable
 	private bool					_socketClosed = false;
 	private Time					_lastKeepAlive;
 	private Time					_lastUpdate;
+	private bool					_connected = false;
+	private ulong					_timerID;
+	private MDAction[ulong]			_timerData;
+	private ulong[ulong]			_timerRefs;	
 	private int chunks = 0;
 	
 	private MDVM*					_vm;
 	private MDThread*				_mainThread;
 	private int						_update;
+	private MDAction*				_test;
+	private ulong					_timerTest;
+	
 	
 	this()
 	{
@@ -69,6 +77,27 @@ class Miney : ISelectable
 		initAPI();
 	}
 	
+	bool miney_timer(void* data)
+	{		
+		MDAction mda = cast(MDAction)data;
+		
+		auto slot = pushRef(_mainThread, mda.mdRef);
+		pushNull(_mainThread);
+		
+		try
+		{
+			rawCall(_mainThread, slot, 1);
+			bool ret = isTrue(_mainThread, -1);
+			pop(_mainThread);
+			return ret;
+		}catch(MDException mde)
+		{
+			
+		}
+		
+		return false;
+	}
+	
 	static uint miney_send(MDThread* t)
 	{
 		Miney m = superGet!(Miney)(t, getUpval(t, 0));
@@ -85,6 +114,55 @@ class Miney : ISelectable
 		return 0;
 	}
 	
+	static uint miney_setTimer(MDThread* t)
+	{
+		Miney m = superGet!(Miney)(t, getUpval(t, 0));
+		auto numParams = stackSize(t) - 2;
+		
+		assert(numParams == 2);
+		
+		long l = getInt(t, 1);
+		ulong r = createRef(t, 2);
+		
+		pushInt(t, m._timerID);
+		
+		auto mda = new MDAction(r);
+		
+		mda.action = Action(TimeSpan.fromMillis(l), &m.miney_timer, cast(void*)mda, true);
+		
+		m._timerData[m._timerID++] = mda;
+		m._network.addAction(mda.action);
+		
+		return 1;
+	}
+	
+	static uint miney_stopTimer(MDThread* t)
+	{
+		Miney m = superGet!(Miney)(t, getUpval(t, 0));
+		auto numParams = stackSize(t) - 2;
+		
+		assert(numParams == 1);
+		
+		ulong r = getInt(t, 1);
+		auto p = r in m._timerData;
+		
+		if(p)
+		{
+			Stdout.formatln("removing timer: {}", r);
+			auto mda = *p;
+			
+			m._network.removeAction(mda.action);
+			m._timerData.remove(r);
+			removeRef(t, mda.mdRef);
+		}
+		else
+		{
+			throwException(t, "invalid timer id {}", r);
+		}
+		
+		return 0;
+	}
+	
 	private void initAPI()
 	{
 		MDThread* t = _mainThread;
@@ -92,6 +170,14 @@ class Miney : ISelectable
 		superPush!(Miney)(t, this);
 		newFunction(t, &miney_send, "send", 1);
 		newGlobal(t, "send");
+		
+		superPush!(Miney)(t, this);
+		newFunction(t, &miney_setTimer, "setTimer", 1);
+		newGlobal(t, "setTimer");
+		
+		superPush!(Miney)(t, this);
+		newFunction(t, &miney_stopTimer, "stopTimer", 1);
+		newGlobal(t, "stopTimer");
 		
 		_update = lookup(_mainThread, "miney.update");
 	}
@@ -103,6 +189,10 @@ class Miney : ISelectable
 	
 	public void handleRead()
 	{
+		if(!_connected)
+		{
+			connected();
+		}
 		//Network will guarantee data to be available here
 		if(_inBuffer.populate() != _inBuffer.Eof)
 		{
@@ -111,6 +201,7 @@ class Miney : ISelectable
 		else
 		{
 			_network.removeBot(this);
+			disconnected();
 		}
 	}
 	
@@ -182,7 +273,7 @@ class Miney : ISelectable
 			_packet.receive(_input);
 		}catch(IOException ioe)
 		{
-			_inBuffer.skip(1-_inBuffer.position);
+			_inBuffer.skip(1 - _inBuffer.position);
 			return false;
 		}
 		
@@ -191,6 +282,60 @@ class Miney : ISelectable
 		_inBuffer.compress;
 		
 		return _inBuffer.readable > 0;
+	}
+	
+	private void connected()
+	{
+		scope(exit) _connected = true;
+		int slot;
+		
+		try
+		{
+			slot = lookupCT!("miney.onConnect")(_mainThread);
+		}catch(MDException mde)
+		{
+			//no onConnect available
+			Stdout("No onConnect handler").newline;
+			return;
+		}
+		
+		pushNull(_mainThread);
+		pushString(_mainThread, _host);
+		pushInt(_mainThread, _port);
+		
+		try
+		{
+			rawCall(_mainThread, slot, 0);
+		}catch(MDException mde)
+		{
+			Stdout.formatln("Error calling onConnect: {}", mde);
+		}
+	}
+	
+	private void disconnected()
+	{
+		scope(exit) _connected = false;
+		int slot;
+		
+		try
+		{
+			slot = lookupCT!("miney.onDisconnect")(_mainThread);
+		}catch(MDException mde)
+		{
+			//no onDisconnect available
+			Stdout("No onDisconnect handler").newline;
+			return;
+		}
+		
+		pushNull(_mainThread);
+		
+		try
+		{
+			rawCall(_mainThread, slot, 0);
+		}catch(MDException mde)
+		{
+			Stdout.formatln("Error calling onDisconnect: {}", mde);
+		}
 	}
 	
 	private void updateWrite()

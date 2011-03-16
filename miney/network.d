@@ -13,12 +13,14 @@ import tango.util.container.LinkedList;
 
 import miney.miney;
 import miney.protocol;
+import miney.timer;
 
 class Network
 {
 	private Selector			_selector;
 	private LinkedList!(Miney)	_bots;
 	private LinkedList!(Miney)	_removeMe;
+	private ActionScheduler		_scheduler;
 	
 	public this()
 	{
@@ -27,6 +29,17 @@ class Network
 		
 		_bots = new LinkedList!(Miney);
 		_removeMe = new LinkedList!(Miney);
+		_scheduler = new ActionScheduler;
+	}
+	
+	public void addAction(Action a)
+	{
+		_scheduler.schedule(a);
+	}
+	
+	public void removeAction(Action a)
+	{
+		_scheduler.unschedule(a);
 	}
 	
 	public void addBot(Miney m)
@@ -52,6 +65,7 @@ class Network
 		
 		while(true)
 		{
+			_scheduler.tick();
 			count = _selector.select(timeout);
 			
 			if(count > 0)
