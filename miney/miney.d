@@ -13,6 +13,8 @@ import tango.io.stream.Buffered;
 import tango.time.Time;
 import tango.time.Clock;
 
+import tango.math.Math;
+
 import Integer = tango.text.convert.Integer;
 
 import tango.core.Thread;
@@ -92,7 +94,8 @@ class Miney : ISelectable
 			return ret;
 		}catch(MDException mde)
 		{
-			
+			Stdout.formatln("error calling timer callback: {}", mde);
+			return true;
 		}
 		
 		return false;
@@ -112,6 +115,29 @@ class Miney : ISelectable
 		}
 		
 		return 0;
+	}
+	
+	static uint miney_distance(MDThread* t)
+	{
+		double x1, y1, z1, x2, y2, z2;
+		
+		auto numParams = stackSize(t) - 1;
+		assert(numParams == 2);
+		
+		x1 = getFloat(t, field(t, 1, "x"));
+		y1 = getFloat(t, field(t, 1, "y"));
+		z1 = getFloat(t, field(t, 1, "z"));
+		x2 = getFloat(t, field(t, 2, "x"));
+		y2 = getFloat(t, field(t, 2, "y"));
+		z2 = getFloat(t, field(t, 2, "z"));
+		
+		double a = x1 - x2;
+		double b = y1 - y2;
+		double c = z1 - z2;
+		
+		pushFloat(t, sqrt(a * a + b * b + c * c));
+		
+		return 1;
 	}
 	
 	static uint miney_setTimer(MDThread* t)
@@ -178,6 +204,9 @@ class Miney : ISelectable
 		superPush!(Miney)(t, this);
 		newFunction(t, &miney_stopTimer, "stopTimer", 1);
 		newGlobal(t, "stopTimer");
+		
+		newFunction(t, &miney_distance, "distance", 0);
+		newGlobal(t, "distance");
 		
 		_update = lookup(_mainThread, "miney.update");
 	}

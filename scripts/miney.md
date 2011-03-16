@@ -3,11 +3,6 @@ module miney
 import mineyStrings
 import math
 
-local function distance(p1, p2)
-{
-	return math.sqrt(math.pow(p1.x - p2.x, 2) + math.pow(p1.y - p2.y, 2) + math.pow(p1.z - p2.z, 2))
-}
-
 global mobs = {}
 local lastAttack = 0
 global namespace position
@@ -100,6 +95,15 @@ global function onConnect(host, port)
 	local t = 0
 	
 	setTimer(1000, attackMobs)
+	writeln $ setTimer(5000, function()
+	{
+		writefln $ "checking distances for {} mobs", #mobs
+		foreach(eid, mob; mobs)
+		{
+			writefln $ "mob distance {} ({}) = {}", eid, MobType.toString(mob.type), distance(position, mob)
+		}
+		return true
+	})
 }
 
 global function onDisconnect()
