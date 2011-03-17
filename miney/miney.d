@@ -74,9 +74,9 @@ class Miney : ISelectable
 		this._mainThread = mainThread(vm);
 		
 		_socket.native.blocking = false;
-		_socket.connect(_host, _port);
 		n.addBot(this);
 		initAPI();
+		init();
 	}
 	
 	bool miney_timer(void* data)
@@ -114,6 +114,21 @@ class Miney : ISelectable
 				continue;
 			m.queue(cast(Sendable)s);
 		}
+		
+		return 0;
+	}
+	
+	static uint miney_connect(MDThread* t)
+	{
+		Miney m = superGet!(Miney)(t, getUpval(t, 0));
+		auto numParams = stackSize(t) - 2;
+		
+		assert(numParams == 2);
+		
+		char[] host = checkStringParam(t, 1);
+		uint port = checkIntParam(t, 2);
+		
+		m._socket.connect(host, port);
 		
 		return 0;
 	}
@@ -206,12 +221,23 @@ class Miney : ISelectable
 		newFunction(t, &miney_stopTimer, "stopTimer", 1);
 		newGlobal(t, "stopTimer");
 		
+		superPush!(Miney)(t, this);
+		newFunction(t, &miney_connect, "connect", 1);
+		newGlobal(t, "connect");
+		
 		newFunction(t, &miney_distance, "distance", 0);
 		newGlobal(t, "distance");
 		
 		lookup(_mainThread, "miney.update");
 		_update = createRef(_mainThread, -1);
 		pop(_mainThread);
+	}
+	
+	private void init()
+	{
+		auto slot = lookupCT!("miney.onInit")(_mainThread);
+		pushNull(_mainThread);
+		rawCall(_mainThread, slot, 0);
 	}
 	
 	Handle fileHandle()
@@ -221,10 +247,6 @@ class Miney : ISelectable
 	
 	public void handleRead()
 	{
-		if(!_connected)
-		{
-			connected();
-		}
 		//Network will guarantee data to be available here
 		if(_inBuffer.populate() != _inBuffer.Eof)
 		{
@@ -239,6 +261,10 @@ class Miney : ISelectable
 	
 	public void handleWrite()
 	{
+		if(!_connected)
+		{
+			connected();
+		}
 		try
 		{
 			_outBuffer.flush;//(_socket);
@@ -250,24 +276,8 @@ class Miney : ISelectable
 		updateWrite();
 	}
 	
-	public void test()
-	{
-		auto h = new Handshake("Ligustah");
-		queue(h);
-	}
-	
 	private void handlePacket(Receivable r)
-	{
-		switch(r.packetID)
-		{
-			case PacketID.Handshake:
-				Login l = new Login("Ligustah", "Password");
-				queue(l);
-				break;
-			default:
-				break;
-		}
-		
+	{		
 		auto slot = lookupCT!("miney.onPacket")(_mainThread);
 		pushNull(_mainThread);
 		superPush!(Receivable)(_mainThread, r);
@@ -446,6 +456,5 @@ void main()
 	Network n = new Network();
 	Miney m = new Miney("localhost", 25565, n, &vm);
 	
-	m.test();
 	n.run();
 }

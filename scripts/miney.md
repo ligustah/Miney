@@ -1,18 +1,21 @@
 module miney
 
+local username = "Ligustah"
+local password = "Password"
+local host = "5.1.141.116"
+local port = 25565
+
 import mineyStrings
 import math
 import hash
 
 global entities = 
 {
-	mobs = function()
-	{
-		return filterTable(this, \k, v->isInt(k) && v.etype == EntityType.Mob)
-	}
+	mobs =    \-> filterTable(this, \k,v->isInt(k) && v.etype == EntityType.Mob)
+	players =  \-> filterTable(this, \k,v->isInt(k) && v.etype == EntityType.Player)
+	vehicles =  \-> filterTable(this, \k,v->isInt(k) && v.etype == EntityType.Vehicle)
 }
 
-local lastAttack = 0
 global namespace position
 {
 	x; y; z; yaw; pitch; onGround; valid = false
@@ -104,7 +107,7 @@ local function handleEntity(p)
 		
 		if(p.packetID == PacketID.MobSpawn)
 		{
-			writefln $ "MobSpawn EID: {} type: {} at {}/{}/{}", EID, MobType.toString(p.type), p.x, p.y, p.z
+			writefln $ "MobSpawn EID: {} type: {} at {}/{}/{}", EID, MobType.toString(p.type), p.x / 32.0, p.y / 32.0, p.z / 32.0
 
 			ent.yaw = p.yaw
 			ent.pitch = p.pitch
@@ -126,9 +129,9 @@ local function handleEntity(p)
 			return
 		}
 		ent.EID = p.EID
-		ent.x = p.x
-		ent.y = p.y
-		ent.z = p.z	
+		ent.x = p.x / 32.0
+		ent.y = p.y / 32.0
+		ent.z = p.z	/ 32.0
 		entities[EID] = ent
 		return
 	}
@@ -137,31 +140,17 @@ local function handleEntity(p)
 
 }
 
+global function onInit()
+{
+	connect(host, port)
+}
+
 global function onConnect(host, port)
 {
 	writefln $ "connected!!! ({}:{})", host, port
-	local t = 0
 	
-	setTimer(1000, attackMobs)
-	setTimer(5000, function()
-	{
-		foreach(eid, mob; entities.mobs())
-		{
-			assert(mob.etype == EntityType.Mob)
-		}
-		writeln $ "all mobs"
-		return true
-	})
-	setTimer(2000, function()
-	{
-		local mobs = entities.mobs()
-		writefln $ "checking distances for {} mobs", #mobs
-		foreach(eid, mob; mobs)
-		{
-			writefln $ "mob distance {} ({}) = {}", eid, MobType.toString(mob.type), distance(position, mob)
-		}
-		return true
-	})
+	send(Handshake(username))
+	//setTimer(1000, attackMobs)
 }
 
 global function onDisconnect()
@@ -179,6 +168,7 @@ global function onPacket(packet)
 			break
 		case PacketID.Handshake:
 			writeln $ "received handshake"
+			send(Login(username, password))
 			break;
 		case PacketID.EntityMetadata:
 			writefln $ "updating {}", packet.EID
