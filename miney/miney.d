@@ -50,7 +50,7 @@ class Miney : ISelectable
 	
 	private MDVM*					_vm;
 	private MDThread*				_mainThread;
-	private int						_update;
+	private ulong					_update;
 	private MDAction*				_test;
 	private ulong					_timerTest;
 	
@@ -94,6 +94,7 @@ class Miney : ISelectable
 			return ret;
 		}catch(MDException mde)
 		{
+			pop(_mainThread);
 			Stdout.formatln("error calling timer callback: {}", mde);
 			return true;
 		}
@@ -208,7 +209,9 @@ class Miney : ISelectable
 		newFunction(t, &miney_distance, "distance", 0);
 		newGlobal(t, "distance");
 		
-		_update = lookup(_mainThread, "miney.update");
+		lookup(_mainThread, "miney.update");
+		_update = createRef(_mainThread, -1);
+		pop(_mainThread);
 	}
 	
 	Handle fileHandle()
@@ -337,6 +340,7 @@ class Miney : ISelectable
 			rawCall(_mainThread, slot, 0);
 		}catch(MDException mde)
 		{
+			pop(_mainThread);
 			Stdout.formatln("Error calling onConnect: {}", mde);
 		}
 	}
@@ -363,6 +367,7 @@ class Miney : ISelectable
 			rawCall(_mainThread, slot, 0);
 		}catch(MDException mde)
 		{
+			pop(_mainThread);
 			Stdout.formatln("Error calling onDisconnect: {}", mde);
 		}
 	}
@@ -398,7 +403,7 @@ class Miney : ISelectable
 		
 		if(now - _lastUpdate >= TimeSpan.fromMillis(50))
 		{
-			auto slot = dup(_mainThread, _update);
+			auto slot = pushRef(_mainThread, _update);
 			pushNull(_mainThread);
 			rawCall(_mainThread, slot, 0);
 			_lastUpdate = now;
@@ -414,6 +419,7 @@ void main()
 	MDVM vm;
 	
 	auto t = openVM(&vm);
+	
 	loadStdlibs(t, MDStdlib.All);
 	initMineyVM(&vm);
 	WrapGlobals!(
@@ -426,13 +432,15 @@ void main()
 	
 	//importModule(t, "miney");
 	char[] path = getString(t, lookupCT!("modules.path")(t));
+	pop(t);
 	path ~= ";scripts";
 	
 	pushGlobal(t, "modules");
 	pushString(t, path);
 	fielda(t, -2, "path");
 	pop(t);
-	importModule(t, "miney");
+	
+	importModuleNoNS(t, "miney");
 	//newGlobal(t, "miney");
 	
 	Network n = new Network();

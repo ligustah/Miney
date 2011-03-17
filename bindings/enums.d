@@ -9,34 +9,12 @@ void initMineyEnums(MDVM* vm)
 	
 	WrapGlobals!(
 		WrapNamespace!(
-		"Face",
-			WrapValue!("BottomY", Face.BottomY),
-			WrapValue!("TopY", Face.TopY),
-			WrapValue!("BottomZ", Face.BottomZ),
-			WrapValue!("TopZ", Face.TopZ),
-			WrapValue!("BottomX", Face.BottomX),
-			WrapValue!("TopX", Face.TopX)
-		),
-		WrapNamespace!(
-		"InventoryType",
-			WrapValue!("Chest", InventoryType.Chest),
-			WrapValue!("Workbench", InventoryType.Workbench),
-			WrapValue!("Furnace", InventoryType.Furnace),
-			WrapValue!("Dispenser", InventoryType.Dispenser)
-		),
-		WrapNamespace!(
-		"ObjectType",
-			WrapValue!("Boat", ObjectType.Boat),
-			WrapValue!("Minecart", ObjectType.Minecart),
-			WrapValue!("StorageCart", ObjectType.StorageCart),
-			WrapValue!("PoweredCart", ObjectType.PoweredCart),
-			WrapValue!("TNT", ObjectType.TNT),
-			WrapValue!("Arrow", ObjectType.Arrow),
-			WrapValue!("SnowBall", ObjectType.SnowBall),
-			WrapValue!("Egg", ObjectType.Egg),
-			WrapValue!("Sand", ObjectType.Sand),
-			WrapValue!("Gravel", ObjectType.Gravel),
-			WrapValue!("FishingFloat", ObjectType.FishingFloat)
+		"InstrumentType",
+			WrapValue!("Harp", InstrumentType.Harp),
+			WrapValue!("DoubleBass", InstrumentType.DoubleBass),
+			WrapValue!("SnareDrum", InstrumentType.SnareDrum),
+			WrapValue!("Sticks", InstrumentType.Sticks),
+			WrapValue!("BassDrum", InstrumentType.BassDrum)
 		),
 		WrapNamespace!(
 		"WoolColor",
@@ -56,6 +34,20 @@ void initMineyEnums(MDVM* vm)
 			WrapValue!("Green", WoolColor.Green),
 			WrapValue!("Red", WoolColor.Red),
 			WrapValue!("Black", WoolColor.Black)
+		),
+		WrapNamespace!(
+		"ObjectType",
+			WrapValue!("Boat", ObjectType.Boat),
+			WrapValue!("Minecart", ObjectType.Minecart),
+			WrapValue!("StorageCart", ObjectType.StorageCart),
+			WrapValue!("PoweredCart", ObjectType.PoweredCart),
+			WrapValue!("TNT", ObjectType.TNT),
+			WrapValue!("Arrow", ObjectType.Arrow),
+			WrapValue!("SnowBall", ObjectType.SnowBall),
+			WrapValue!("Egg", ObjectType.Egg),
+			WrapValue!("Sand", ObjectType.Sand),
+			WrapValue!("Gravel", ObjectType.Gravel),
+			WrapValue!("FishingFloat", ObjectType.FishingFloat)
 		),
 		WrapNamespace!(
 		"MobType",
@@ -129,18 +121,32 @@ void initMineyEnums(MDVM* vm)
 			WrapValue!("Disconnect", PacketID.Disconnect)
 		),
 		WrapNamespace!(
-		"InstrumentType",
-			WrapValue!("Harp", InstrumentType.Harp),
-			WrapValue!("DoubleBass", InstrumentType.DoubleBass),
-			WrapValue!("SnareDrum", InstrumentType.SnareDrum),
-			WrapValue!("Sticks", InstrumentType.Sticks),
-			WrapValue!("BassDrum", InstrumentType.BassDrum)
-		),
-		WrapNamespace!(
 		"DiggingStatus",
 			WrapValue!("StartedDigging", DiggingStatus.StartedDigging),
 			WrapValue!("FinishedDigging", DiggingStatus.FinishedDigging),
 			WrapValue!("DropItem", DiggingStatus.DropItem)
+		),
+		WrapNamespace!(
+		"Face",
+			WrapValue!("BottomY", Face.BottomY),
+			WrapValue!("TopY", Face.TopY),
+			WrapValue!("BottomZ", Face.BottomZ),
+			WrapValue!("TopZ", Face.TopZ),
+			WrapValue!("BottomX", Face.BottomX),
+			WrapValue!("TopX", Face.TopX)
+		),
+		WrapNamespace!(
+		"InventoryType",
+			WrapValue!("Chest", InventoryType.Chest),
+			WrapValue!("Workbench", InventoryType.Workbench),
+			WrapValue!("Furnace", InventoryType.Furnace),
+			WrapValue!("Dispenser", InventoryType.Dispenser)
+		),
+		WrapNamespace!(
+		"EntityType",
+			WrapValue!("Mob", EntityType.Mob),
+			WrapValue!("Vehicle", EntityType.Vehicle),
+			WrapValue!("Player", EntityType.Player)
 		)
 	)(t);
 	

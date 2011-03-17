@@ -233,6 +233,13 @@ enum InventoryType : byte
 	Dispenser = 0x03
 }
 
+enum EntityType : byte
+{
+	Mob = 0x00,
+	Vehicle = 0x01,
+	Player = 0x02
+}
+
 /*
 enum AuthCode
 {

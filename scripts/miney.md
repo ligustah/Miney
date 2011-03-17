@@ -2,8 +2,16 @@ module miney
 
 import mineyStrings
 import math
+import hash
 
-global mobs = {}
+global entities = 
+{
+	mobs = function()
+	{
+		return filterTable(this, \k, v->isInt(k) && v.etype == EntityType.Mob)
+	}
+}
+
 local lastAttack = 0
 global namespace position
 {
@@ -17,6 +25,19 @@ global namespace position
 			send(PlayerPositionLook(x, y, z, y + 1.65, yaw, pitch, onGround))
 		}
 	}
+}
+
+global function filterTable(t : table, pred : function)
+{
+	local newTab = t.dup()
+	
+	foreach(k, v; newTab, "modify")
+	{
+		if(!pred(k, v))
+			hash.remove(newTab, k)
+	}
+	
+	return newTab
 }
 
 local function onEntity(packet)
@@ -34,9 +55,11 @@ local function printPosition(pos, fmt = "")
 
 local function attackMobs()
 {
-	foreach(eid, mob; mobs)
+	foreach(eid, ent; entities.mobs())
 	{
-		local dis = distance(position, mob)
+		if(ent.etype != EntityType.Mob)
+			continue;
+		local dis = distance(position, ent)
 		
 		if(dis <= 4)
 		{
@@ -46,7 +69,25 @@ local function attackMobs()
 	}
 }
 
-local function handleMob(p)
+local function moveEntity(e, p)
+{
+	if(		p.packetID == PacketID.EntityRelativeMove
+		||	p.packetID == PacketID.EntityLookRelativeMove )
+	{
+		e.x += p.dX / 32.0
+		e.y += p.dY / 32.0
+		e.z += p.dZ / 32.0
+	}
+	
+	if(		p.packetID == PacketID.EntityLook
+		||	p.packetID == PacketID.EntityLookRelativeMove )
+	{
+			e.yaw = p.yaw
+			e.pitch = p.pitch
+	}
+}
+
+local function handleEntity(p)
 {
 	local EID
 	try
@@ -54,39 +95,46 @@ local function handleMob(p)
 		EID = p.EID
 	}catch(e){ return }
 	
-	if(EID !in mobs)
+	if(p.packetID == PacketID.Login)
+		return
+	
+	if(EID !in entities)
 	{
+		local ent = {}
+		
 		if(p.packetID == PacketID.MobSpawn)
 		{
-			mobs[EID] = { }
-			local mob = mobs[EID]
 			writefln $ "MobSpawn EID: {} type: {} at {}/{}/{}", EID, MobType.toString(p.type), p.x, p.y, p.z
-			mob.x = p.x
-			mob.y = p.y
-			mob.z = p.z
-			mob.yaw = p.yaw
-			mob.pitch = p.pitch
-			mob.type = p.type
+
+			ent.yaw = p.yaw
+			ent.pitch = p.pitch
+			ent.type = p.type
+			ent.etype = EntityType.Mob
 		}
+		else if(p.packetID == PacketID.NamedEntitySpawn)
+		{
+			ent.name = p.name
+			ent.rotation = p.rotation
+			ent.pitch = p.pitch
+			ent.currentItem = p.currentItem
+			ent.etype = EntityType.Player
+		}
+		else
+		{
+			writefln $ "Warning: unhandled entity spawn: {} EID: {}", PacketID.toString(p.packetID), p.EID
+			ent = null
+			return
+		}
+		ent.EID = p.EID
+		ent.x = p.x
+		ent.y = p.y
+		ent.z = p.z	
+		entities[EID] = ent
 		return
 	}
 	
-	local mob = mobs[EID]
-	
-	if(		p.packetID == PacketID.EntityRelativeMove
-		||	p.packetID == PacketID.EntityLookRelativeMove )
-	{
-		mob.x += p.dX / 32.0
-		mob.y += p.dY / 32.0
-		mob.z += p.dZ / 32.0
-	}
-	
-	if(		p.packetID == PacketID.EntityLook
-		||	p.packetID == PacketID.EntityLookRelativeMove )
-	{
-			mob.yaw = p.yaw
-			mob.pitch = p.pitch
-	}
+	moveEntity(entities[EID], p)
+
 }
 
 global function onConnect(host, port)
@@ -95,8 +143,18 @@ global function onConnect(host, port)
 	local t = 0
 	
 	setTimer(1000, attackMobs)
-	writeln $ setTimer(5000, function()
+	setTimer(5000, function()
 	{
+		foreach(eid, mob; entities.mobs())
+		{
+			assert(mob.etype == EntityType.Mob)
+		}
+		writeln $ "all mobs"
+		return true
+	})
+	setTimer(2000, function()
+	{
+		local mobs = entities.mobs()
 		writefln $ "checking distances for {} mobs", #mobs
 		foreach(eid, mob; mobs)
 		{
@@ -113,7 +171,7 @@ global function onDisconnect()
 
 global function onPacket(packet)
 {
-	handleMob(packet)
+	handleEntity(packet)
 	switch(packet.packetID)
 	{
 		case PacketID.Login:
@@ -125,10 +183,10 @@ global function onPacket(packet)
 		case PacketID.EntityMetadata:
 			writefln $ "updating {}", packet.EID
 		case PacketID.DestroyEntity:
-			if(packet.EID in mobs)
+			if(packet.EID in entities)
 			{
-				writefln $ "{} {} died", MobType.toString(mobs[packet.EID].type), packet.EID
-				mobs[packet.EID] = null
+				writefln $ "{} {} died", MobType.toString(entities[packet.EID].type), packet.EID
+				entities[packet.EID] = null
 			}
 			break
 		case PacketID.PlayerPositionLook:

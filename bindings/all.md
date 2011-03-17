@@ -372,4 +372,10 @@ global enums =
 			Sticks = 0x03,
 			BassDrum = 0x04
 		"
+	EntityType =
+		"
+			Mob = 0x00,
+			Vehicle = 0x01,
+			Player = 0x02
+		"
 }
