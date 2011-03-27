@@ -145,8 +145,15 @@ void initMineyEnums(MDVM* vm)
 		WrapNamespace!(
 		"EntityType",
 			WrapValue!("Mob", EntityType.Mob),
-			WrapValue!("Vehicle", EntityType.Vehicle),
-			WrapValue!("Player", EntityType.Player)
+			WrapValue!("Object", EntityType.Object),
+			WrapValue!("Player", EntityType.Player),
+			WrapValue!("Pickup", EntityType.Pickup)
+		),
+		WrapNamespace!(
+		"EntAction",
+			WrapValue!("Crouch", EntAction.Crouch),
+			WrapValue!("Uncrouch", EntAction.Uncrouch),
+			WrapValue!("LeaveBed", EntAction.LeaveBed)
 		)
 	)(t);
 	

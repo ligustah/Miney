@@ -8,7 +8,7 @@ void initMineyClasses(MDVM* vm)
 {
 	MDThread* t = mainThread(vm);
 	
-	WrapGlobals!(
+	WrapGlobals!(WrapType!(MetadataPacket, "MetadataPacket"),
 		WrapType!(
 			Sendable,
 			"Sendable",

@@ -7,6 +7,7 @@ import tango.io.Stdout;
 import tango.time.Time;
 
 import tango.core.Traits;
+import tango.core.Variant;
 import tango.core.Tuple;
 
 import tango.util.container.LinkedList;
@@ -61,7 +62,7 @@ class Network
 	public void run()
 	{
 		int count;
-		TimeSpan timeout = TimeSpan.fromMillis(500);
+		TimeSpan timeout = TimeSpan.fromMillis(50);
 		
 		while(true)
 		{
@@ -286,8 +287,9 @@ class MinecraftDataInput : DataInput
 	
 	public alias get opOr;
 	
-	public void metadata()
+	public Variant[] metadata()
 	{
+		Variant[] vars;
 		byte x;
 		int n = 0;
 		
@@ -295,7 +297,7 @@ class MinecraftDataInput : DataInput
 		{
 			this|x;
 			
-			if(x == 0x7F)
+			if(x == 0x7F) // end of metadata
 				break;
 				
 			//Stdout.format("{}: ", n++);
@@ -305,27 +307,32 @@ class MinecraftDataInput : DataInput
 			switch(y)
 			{
 				case 0:
-					Stdout.format("", getByte);
+					vars ~= Variant(getByte);
 					break;
 				case 1:
-					Stdout.format("", getShort);
+					vars ~= Variant(getShort);
 					break;
 				case 2:
-					Stdout.format("", getInt);
+					vars ~= Variant(getInt);
 					break;
 				case 3:
-					Stdout.format("", getFloat);
+					vars ~= Variant(getFloat);
 					break;
 				case 4:
-					Stdout.format("", getString);
+					vars ~= Variant(getString);
 					break;
 				case 5:
-					Stdout.format("", getShort, getByte, getShort);
+					vars ~= Variant([Variant(getShort), Variant(getByte), Variant(getShort)]);
+					break;
+				case 6:
+					vars ~= Variant([Variant(getInt), Variant(getInt), Variant(getInt)]);
 					break;
 				default:
 					assert(0, "invalid metadata");
 			}
 		}
+		
+		return vars;
 	}
 }
 
@@ -355,4 +362,12 @@ interface Receivable
 	public PacketID packetID();
 	public size_t minSize();
 	public int receive(MinecraftDataInput);
+}
+
+class MetadataPacket
+{
+	public Variant[] metadata()
+	{
+		assert(false, "not implemented");
+	}
 }

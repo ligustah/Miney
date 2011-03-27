@@ -4,6 +4,7 @@ import minid.api;
 import minid.bind;
 
 import tango.net.device.Socket;
+import tango.io.device.Array;
 
 import tango.io.selector.Selector;
 import tango.io.stream.Buffered;
@@ -20,6 +21,7 @@ import Integer = tango.text.convert.Integer;
 import tango.core.Thread;
 import tango.core.Memory;
 import tango.core.Exception;
+import tango.core.Variant;
 
 import miney.protocol;
 import miney.timer;
@@ -47,6 +49,8 @@ class Miney : ISelectable
 	private MDAction[ulong]			_timerData;
 	private ulong[ulong]			_timerRefs;	
 	private int chunks = 0;
+	private long					_download;
+	private long					_upload;
 	
 	private MDVM*					_vm;
 	private MDThread*				_mainThread;
@@ -94,8 +98,12 @@ class Miney : ISelectable
 			return ret;
 		}catch(MDException mde)
 		{
+			catchException(_mainThread);
 			pop(_mainThread);
+			
 			Stdout.formatln("error calling timer callback: {}", mde);
+			Stdout.formatln(getString(_mainThread, getTraceback(_mainThread))).flush;
+			pop(_mainThread);
 			return true;
 		}
 		
@@ -112,10 +120,62 @@ class Miney : ISelectable
 			Sendable s = superGet!(Sendable)(t, i);
 			if(s is null)
 				continue;
-			m.queue(cast(Sendable)s);
+			m.queue(s);
 		}
 		
 		return 0;
+	}
+	
+	static uint miney_raw(MDThread* t)
+	{
+		Sendable s = superGet!(Sendable)(t, 1);
+		Array a = new Array(64, 64);
+		MinecraftDataOutput output = new MinecraftDataOutput(a);
+		
+		output | s;
+		
+		pushString(t, cast(char[])a.slice);
+		
+		return 1;
+	}
+	
+	static uint miney_metadata(MDThread* t)
+	{
+		MetadataPacket mp = superGet!(MetadataPacket)(t, 1);
+			
+		Variant[] variants = mp.metadata;
+		
+		if(!variants.length)
+		{
+			newArray(t, 0);
+			return 1;
+		}
+		
+		foreach(v; variants)
+		{
+			if(v.isImplicitly!(int))
+				pushInt(t, v.get!(int));
+			else if(v.isA!(float))
+				pushFloat(t, v.get!(float));
+			else if(v.isA!(char[]))
+				pushString(t, v.get!(char[]));
+			else if(v.isA!(Variant[]))
+			{
+				Variant[] vars = v.get!(Variant[]);
+				
+				assert(vars.length == 3, "metadata must be a triple");
+				
+				foreach(var; vars)
+					pushInt(t, var.get!(int));
+				
+				newArrayFromStack(t, 3);
+			}
+			else
+				assert(0, "invalid metadata");
+		}
+		newArrayFromStack(t, variants.length);
+		
+		return 1;
 	}
 	
 	static uint miney_connect(MDThread* t)
@@ -213,6 +273,9 @@ class Miney : ISelectable
 		newFunction(t, &miney_send, "send", 1);
 		newGlobal(t, "send");
 		
+		newFunction(t, &miney_raw, "raw", 0);
+		newGlobal(t, "raw");
+		
 		superPush!(Miney)(t, this);
 		newFunction(t, &miney_setTimer, "setTimer", 1);
 		newGlobal(t, "setTimer");
@@ -227,6 +290,9 @@ class Miney : ISelectable
 		
 		newFunction(t, &miney_distance, "distance", 0);
 		newGlobal(t, "distance");
+		
+		newFunction(t, &miney_metadata, "metadata", 0);
+		newGlobal(t, "metadata");
 		
 		lookup(_mainThread, "miney.update");
 		_update = createRef(_mainThread, -1);
@@ -248,9 +314,10 @@ class Miney : ISelectable
 	public void handleRead()
 	{
 		//Network will guarantee data to be available here
-		if(_inBuffer.populate() != _inBuffer.Eof)
+		size_t read = _inBuffer.populate();
+		if(read != _inBuffer.Eof)
 		{
-				while(parse()){}
+			while(parse()){}
 		}
 		else
 		{
@@ -261,18 +328,20 @@ class Miney : ISelectable
 	
 	public void handleWrite()
 	{
+		long before = _outBuffer.limit();
 		if(!_connected)
 		{
 			connected();
 		}
 		try
 		{
-			_outBuffer.flush;//(_socket);
+			_outBuffer.flush();
 		}catch(Exception ioe)
 		{
 			Stdout.formatln("exception: {}", ioe);
 			//need to wait for next turn
 		}
+		_upload += before - _outBuffer.limit();
 		updateWrite();
 	}
 	
@@ -319,6 +388,7 @@ class Miney : ISelectable
 			return false;
 		}
 		
+		_download += _inBuffer.position;
 		handlePacket(_packet);
 		_packet = null;
 		_inBuffer.compress;
@@ -408,15 +478,19 @@ class Miney : ISelectable
 			gc(_mainThread);
 			GC.collect();
 			//GC.minimize();
-			Stdout.formatln("bytes allocated: {} stack size: {}", bytesAllocated(_vm), stackSize(_mainThread));
+			//Stdout.formatln("bytes allocated: {} stack size: {}", bytesAllocated(_vm), stackSize(_mainThread));
 		}
 		
 		if(now - _lastUpdate >= TimeSpan.fromMillis(50))
 		{
 			auto slot = pushRef(_mainThread, _update);
 			pushNull(_mainThread);
+			pushInt(_mainThread, _download);
+			pushInt(_mainThread, _upload);
 			rawCall(_mainThread, slot, 0);
 			_lastUpdate = now;
+			_download = 0;
+			_upload = 0;
 		}
 	
 		

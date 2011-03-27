@@ -375,7 +375,14 @@ global enums =
 	EntityType =
 		"
 			Mob = 0x00,
-			Vehicle = 0x01,
-			Player = 0x02
+			Object = 0x01,
+			Player = 0x02,
+			Pickup = 0x03
+		"
+	EntAction =
+		"
+			Crouch = 0x01,
+			Uncrouch = 0x02,
+			LeaveBed = 0x03
 		"
 }

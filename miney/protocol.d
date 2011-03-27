@@ -1,6 +1,7 @@
 module miney.protocol;
 
 import tango.core.Traits;
+import tango.core.Variant;
 
 import tango.io.Stdout;
 
@@ -236,8 +237,16 @@ enum InventoryType : byte
 enum EntityType : byte
 {
 	Mob = 0x00,
-	Vehicle = 0x01,
-	Player = 0x02
+	Object = 0x01,
+	Player = 0x02,
+	Pickup = 0x03
+}
+
+enum EntAction : byte
+{
+	Crouch = 0x01,
+	Uncrouch = 0x02,
+	LeaveBed = 0x03
 }
 
 /*
@@ -1027,9 +1036,8 @@ class AddObject : Receivable
 	}
 }
 
-
 // TODO metadata
-class MobSpawn : Receivable
+class MobSpawn : MetadataPacket, Receivable
 {
 	mixin(_packetID!("MobSpawn"));
 	mixin(_minSize!(20));
@@ -1044,6 +1052,9 @@ class MobSpawn : Receivable
 	mixin(_getter!("type"));
 	mixin(_getter!("yaw"));
 	mixin(_getter!("pitch"));
+	
+	Variant[] _metadata;
+	mixin(_getter!("metadata"));
 	
 	public this()
 	{
@@ -1061,7 +1072,7 @@ class MobSpawn : Receivable
 		|_yaw
 		|_pitch;
 		
-		input.metadata();
+		_metadata = input.metadata();
 		
 		return minSize;
 	}
@@ -1370,7 +1381,7 @@ class AttachEntity : Receivable
 	}
 }
 
-class EntityMetadata : Receivable
+class EntityMetadata : MetadataPacket, Receivable
 {
 	mixin(_packetID!("EntityMetadata"));
 	mixin(_minSize!(5));
@@ -1378,6 +1389,9 @@ class EntityMetadata : Receivable
 	private int _EID;
 	
 	mixin(_getter!("EID"));
+	
+	Variant[] _metadata;
+	mixin(_getter!("metadata"));
 	
 	public this()
 	{
@@ -1388,7 +1402,7 @@ class EntityMetadata : Receivable
 		input
 		|_EID;
 		
-		input.metadata();
+		_metadata = input.metadata();
 		
 		return minSize;
 	}

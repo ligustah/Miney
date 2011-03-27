@@ -1,6 +1,8 @@
 module mineyStrings
 
-local ns = [MobType, ObjectType, PacketID, WoolColor, DiggingStatus, Face, ObjectType, InventoryType, InstrumentType]
+local ns = [MobType, ObjectType, PacketID, WoolColor, DiggingStatus
+		Face, ObjectType, InventoryType, InstrumentType, EntityType
+		EntAction]
 
 foreach(n; ns)
 {
