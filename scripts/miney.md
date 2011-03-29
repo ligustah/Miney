@@ -1,10 +1,15 @@
 module miney
 
+//standard library imports
+import math
+import time : timestamp
+import os
+import hash
+
 local username = "Moep"
 local password = "Password"
 local host = "localhost"
 local port = 25565
-
 
 //padd username with null bytes
 //local needed = 256 - #username - #(" connected!")
@@ -14,11 +19,16 @@ local port = 25565
 //username ~= "\u00ff\u0000" ~ toChar(#message)
 //username ~= message
 
+import signal : emit
+
+signal.add("Init")
+signal.add("Connect")
+signal.add("ConnectionClosed")
+
+import position
+import map
+import entities
 import mineyStrings
-import math
-import time : timestamp
-import os
-import hash
 
 local randomStringPool = [toChar(x) for x in 0 .. 128 if toChar(x).isAlNum()]
 
@@ -34,46 +44,15 @@ local function randomString(len : int = 10, colored : bool = false)
 	return buf.toString()
 }
 
-username = randomString(10, true)
-
-global entities = 
-{
-	mobs	= \-> filterTable(this, \k,v->isInt(k) && v.etype == EntityType.Mob)
-	pickups	= \-> filterTable(this, \k,v->isInt(k) && v.etype == EntityType.Pickup)
-	players	= \-> filterTable(this, \k,v->isInt(k) && v.etype == EntityType.Player)
-	objects	= \-> filterTable(this, \k,v->isInt(k) && v.etype == EntityType.Object)
-}
+username = randomString()
 
 global time_connected = 0
 global total_download = 0
 global total_upload = 0
 
-global map
-{
-}
-
 global namespace spawn
 {
 	x; y; z
-}
-
-global namespace position
-{
-	x; y; z; yaw; pitch; onGround; valid = false
-	
-	function update()
-	{
-		if(valid)
-		{
-			//writefln("sending position: {}/{}/{} {}", x, y, z, onGround)
-			send(PlayerPositionLook(x, y, z, y + 1.65, yaw, pitch, onGround))
-		}
-	}
-	
-	function block()
-	{
-		return toInt(x), toInt(y), toInt(z)
-	}
 }
 
 global health = 0
@@ -115,60 +94,6 @@ local function attackMobs()
 	}
 }
 
-local function spawnEntity(p)
-{
-	local ent = {}
-	
-	if(p.packetID == PacketID.MobSpawn)
-	{
-		//writefln $ "MobSpawn EID: {} type: {} at {}/{}/{}", p.EID, MobType.toString(p.type), p.x / 32.0, p.y / 32.0, p.z / 32.0
-		
-		ent.yaw = p.yaw
-		ent.pitch = p.pitch
-		ent.type = p.type
-		ent.etype = EntityType.Mob
-		ent.metadata = metadata(p)
-	}
-	else if(p.packetID == PacketID.NamedEntitySpawn)
-	{
-		ent.name = p.name
-		ent.rotation = p.rotation
-		ent.pitch = p.pitch
-		ent.currentItem = p.currentItem
-		ent.etype = EntityType.Player
-	}
-	else if(p.packetID == PacketID.PickupSpawn)
-	{
-		//writefln $ "PickupSpawn EID: {} item: {} at {}/{}/{}", EID, p.itemID, p.x / 32.0, p.y / 32.0, p.z / 32.0
-		
-		ent.count = p.count
-		ent.itemID = p.itemID
-		ent.rotation = p.rotation
-		ent.pitch = p.pitch
-		ent.roll = p.roll
-		ent.damage = p.damage
-		ent.etype = EntityType.Pickup
-	}
-	else if(p.packetID == PacketID.AddObject)
-	{
-		ent.type = p.type
-		ent.etype = EntityType.Object
-	}
-	else
-	{
-		//writefln $ "Warning: unhandled entity spawn: {} EID: {} {}", PacketID.toString(p.packetID), p.EID
-		
-		ent = null
-		return
-	}
-	ent.EID = p.EID
-	ent.x = p.x
-	ent.y = p.y
-	ent.z = p.z
-	entities[ent.EID] = ent
-	return true
-}
-
 local function moveEntity(e, p)
 {
 	local interesting = false
@@ -200,36 +125,18 @@ local function moveEntity(e, p)
 	return interesting
 }
 
-local function handleEntity(p)
-{
-	local EID
-	try
+onEntityTeleport(\p -> 
+	modifyEntity(\e
 	{
-		EID = p.EID
-	}catch(e){ return }
-	
-	if(p.packetID == PacketID.Login)
-		return
-	
-	if(EID !in entities)
-	{
-		return spawnEntity(p)
-	}
-	else if(p.packetID == PacketID.UseBed)
-	{
-		local ent = entities[EID]
-		
-		send $ Chat $ format $ "{} is going to bed", ent.name
-	}
-	else
-	{
-		return moveEntity(entities[EID], p)
-	}
-
-}
+		e.x = p.x
+		e.y = p.y
+		e.z = p.z
+	})
+)
 
 global function onInit()
 {
+	emit("Init")
 	connect(host, port)
 }
 
@@ -269,11 +176,6 @@ global function onConnect(host, port)
 		writefln $ "my position: {,3:f2}/{,3:f2}/{,3:f2}", position.x, position.y, position.z
 	})
 */
-	setTimer(100, function()
-	{
-		send(Login(randomString(10, true), "password"), Chat(randomString(34, true)))
-	})
-
 /+	setTimer(10000, function()
 	{
 		local needed = 256 - #username - #("xx:xx <> ")
@@ -296,12 +198,8 @@ global function onDisconnect()
 global function onPacket(packet)
 {
 	//writefln $ "getting packet: {}", PacketID.toString(packet.packetID)
-	if(handleEntity(packet))
-		return
 	switch(packet.packetID)
 	{
-		case PacketID.KeepAlive:
-			break
 		case PacketID.Disconnect:
 			writefln $ "getting kicked: {}", packet.reason
 			break
@@ -313,31 +211,9 @@ global function onPacket(packet)
 			send(Login(username, password))
 			break
 		case PacketID.EntityMetadata:
-			writefln $ "updating {} ({})", packet.EID, EntityType.toString(entities[packet.EID].etype)
+			writefln $ "updating {} ({})", packet.EID, EntityType.toString(entities.get(packet.EID).etype)
 			entities[packet.EID].metadata = metadata(packet)
 			break
-		case PacketID.DestroyEntity:
-			if(packet.EID in entities)
-			{
-				//writefln $ "{} {} died", MobType.toString(entities[packet.EID].type), packet.EID
-				//writefln $ "destroying {}:{}", EntityType.toString(entities[packet.EID].etype), packet.EID
-				entities[packet.EID] = null
-			}
-			break
-		case PacketID.PlayerPositionLook:
-			//writefln $ "PPL: X={} Y={} Z={} onGround={}", packet.x, packet.y, packet.z, packet.onGround
-			position.x = packet.x
-			position.y = packet.y
-			position.z = packet.z
-			position.yaw = packet.yaw
-			position.pitch = packet.pitch
-			position.onGround = packet.onGround
-			if(!position.valid)
-			{
-				position.valid = true
-			}
-			position.update()
-			break;
 		case PacketID.Chat:
 			//writefln $ "Chat: {}", packet.message
 			break
@@ -347,17 +223,18 @@ global function onPacket(packet)
 		case PacketID.UpdateHealth:
 			health = packet.health
 			break
-		case PacketID.SpawnPosition:
-			spawn.x = packet.x
-			spawn.y = packet.y
-			spawn.z = packet.z
-			break
-		case PacketID.EntityVelocity:
-			break
 		default:
 			//writefln $ "unhandled packet: {}", PacketID.toString(packet.packetID)
 			break
 	}
+	try
+		emit((PacketID.toString $ packet.packetID), packet)
+	catch(e)
+	{
+		writeln("caught exception: ", e)
+		writeln(thread.traceback())
+	}
+
 }
 
 global function update(download, upload)

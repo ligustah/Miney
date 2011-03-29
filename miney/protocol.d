@@ -4,10 +4,12 @@ import tango.core.Traits;
 import tango.core.Variant;
 
 import tango.io.Stdout;
+import tango.io.compress.ZlibStream;
 
 import miney.network;
 import miney.util;
 
+pragma(lib, "zlib.lib");
 
 static const int ProtocolVersion = 9;
 
@@ -33,6 +35,7 @@ static void findHandlers(ModuleInfo mod)
 		if(implements(cl, Receivable.classinfo))
 			addHandler(cl);
 	}
+	PacketHandlers.rehash;
 }
 
 static bool implements(ClassInfo ci, ClassInfo interfac)
@@ -1470,8 +1473,10 @@ class MapChunk : Receivable
 		|_sizeZ
 		|_size;
 		
-		_data = new byte[_size];
-		input.read(_data);
+		byte[] compressed = new byte[_size];
+		_data = new byte[cast(uint)((_sizeX+1) * (_sizeY+1) * (_sizeZ+1) * 2.5)];
+		scope zip = new ZlibInput(input);
+		zip.read(_data);
 		
 		return minSize + _size;
 	}

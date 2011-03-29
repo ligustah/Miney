@@ -19,6 +19,7 @@ import tango.math.Math;
 import Integer = tango.text.convert.Integer;
 
 import tango.core.Thread;
+import tango.core.Array;
 import tango.core.Memory;
 import tango.core.Exception;
 import tango.core.Variant;
@@ -492,8 +493,7 @@ class Miney : ISelectable
 			_download = 0;
 			_upload = 0;
 		}
-	
-		
+
 		updateWrite();
 	}
 }
@@ -514,7 +514,14 @@ void main()
 		)
 	)(t);
 	
-	//importModule(t, "miney");
+	foreach(k; PacketHandlers.values)
+	{
+		char[] name = k.name;
+		pushString(t, name[name.rfind('.')+1..$]);
+	}
+	newArrayFromStack(t, PacketHandlers.length);
+	newGlobal(t, "receivables");
+	
 	char[] path = getString(t, lookupCT!("modules.path")(t));
 	pop(t);
 	path ~= ";scripts";
@@ -525,7 +532,6 @@ void main()
 	pop(t);
 	
 	importModuleNoNS(t, "miney");
-	//newGlobal(t, "miney");
 	
 	Network n = new Network();
 	Miney m = new Miney("localhost", 25565, n, &vm);
