@@ -3,4 +3,10 @@ This is a fun project!
 When it is finished some day (if it all) it will be a Minecraft bot that can
 do various tasks on a Minecraft server.
 
-Mainly using this to sync files between my netbook and my desktop.
+At the moment it is mainly driven by http://dsource.org/projects/minid and hence
+based on the D programming language. But it will eventually be ported to C++ (ugh),
+when MiniD has completely been ported to C++.
+
+It is for some parts inspired by Mineflayer but i'm trying to make extensive
+use of MiniD's awesome features.
+
