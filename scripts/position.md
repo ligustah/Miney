@@ -1,6 +1,6 @@
 module position
 
-import signal
+import signal : emit
 signal.add("LoginComplete")
 
 global x, y, z, yaw, pitch, onGround
@@ -21,7 +21,7 @@ function block()
 	return toInt(x), toInt(y), toInt(z)
 }
 
-onPlayerPositionLook(\p
+local function ppl(p)
 {
 	x = p.x
 	y = p.y
@@ -29,10 +29,13 @@ onPlayerPositionLook(\p
 	yaw = p.yaw
 	pitch = p.pitch
 	onGround = p.onGround
+}
+
+onPlayerPositionLook(\p
+{
+	ppl(p)
+	emit $ "LoginComplete"
+	onPlayerPositionLook(ppl)
 	
-	if(!valid)
-	{
-		valid = true
-		emit $ "LoginComplete"
-	}
+	return true // remove this one
 })

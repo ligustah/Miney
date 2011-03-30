@@ -58,19 +58,6 @@ global namespace spawn
 global health = 0
 global time = 0
 
-global function filterTable(t : table, pred : function)
-{
-	local newTab = t.dup()
-	
-	foreach(k, v; newTab, "modify")
-	{
-		if(!pred(k, v))
-			hash.remove(newTab, k)
-	}
-	
-	return newTab
-}
-
 local function printPosition(pos, fmt = "")
 {
 	writefln $ "{} {}/{}/{}", fmt, pos.x, pos.y, pos.z
@@ -78,8 +65,6 @@ local function printPosition(pos, fmt = "")
 
 local function attackMobs()
 {
-	if(!position.valid)
-		return
 	foreach(eid, ent; entities.mobs())
 	{
 		if(ent.etype != EntityType.Mob)
@@ -94,50 +79,16 @@ local function attackMobs()
 	}
 }
 
-local function moveEntity(e, p)
-{
-	local interesting = false
-	if(		p.packetID == PacketID.EntityRelativeMove
-		||	p.packetID == PacketID.EntityLookRelativeMove )
-	{
-		e.x += p.dX
-		e.y += p.dY
-		e.z += p.dZ
-		interesting = true
-	}
-	
-	if(		p.packetID == PacketID.EntityLook
-		||	p.packetID == PacketID.EntityLookRelativeMove 
-		||	p.packetID == PacketID.EntityTeleport )
-	{
-		e.yaw = p.yaw
-		e.pitch = p.pitch
-		interesting = true
-	}
-	
-	if(p.packetID == PacketID.EntityTeleport)
-	{
-		e.x = p.x
-		e.y = p.y
-		e.z = p.z
-	}
-	
-	return interesting
-}
-
-onEntityTeleport(\p -> 
-	modifyEntity(\e
-	{
-		e.x = p.x
-		e.y = p.y
-		e.z = p.z
-	})
-)
-
 global function onInit()
 {
 	emit("Init")
 	connect(host, port)
+	onHandshake(\p{
+		send(Login(username, "password"))
+		
+		//this only needs to be done once
+		return true
+	})
 }
 
 global function onConnect(host, port)
@@ -200,19 +151,8 @@ global function onPacket(packet)
 	//writefln $ "getting packet: {}", PacketID.toString(packet.packetID)
 	switch(packet.packetID)
 	{
-		case PacketID.Disconnect:
-			writefln $ "getting kicked: {}", packet.reason
-			break
 		case PacketID.Login:
 			writefln $ "mapSeed: {}", packet.mapSeed
-			break
-		case PacketID.Handshake:
-			writeln $ "received handshake"
-			send(Login(username, password))
-			break
-		case PacketID.EntityMetadata:
-			writefln $ "updating {} ({})", packet.EID, EntityType.toString(entities.get(packet.EID).etype)
-			entities[packet.EID].metadata = metadata(packet)
 			break
 		case PacketID.Chat:
 			//writefln $ "Chat: {}", packet.message

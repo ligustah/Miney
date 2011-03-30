@@ -4,6 +4,19 @@ local _ents =
 {
 }
 
+local function filterTable(t : table, pred : function)
+{
+	local newTab = t.dup()
+	
+	foreach(k, v; newTab, "modify")
+	{
+		if(!pred(k, v))
+			hash.remove(newTab, k)
+	}
+	
+	return newTab
+}
+
 onDestroyEntity(\p{	_ents[p.EID] = null })
 
 global mobs		= \-> filterTable(_ents, \k,v->v.etype == EntityType.Mob)
@@ -13,6 +26,27 @@ global objects	= \-> filterTable(_ents, \k,v->v.etype == EntityType.Object)
 global all		= \-> _ents
 
 global function get(eid) = _ents[eid]
+
+global function modify(eid : int, modifier : function)
+{
+	local ent = _ents[eid]
+	modifier(ent)
+}
+
+global function new(p, extra : function)
+{
+	local EID = p.EID
+	
+	if(EID in _ents)
+		return
+	local ent = {}
+	ent.x = p.x
+	ent.y = p.y
+	ent.z = p.z
+	ent.EID = EID
+	extra(ent)
+	_ents[EID] = ent
+}
 
 @onUseBed
 local function handleEntity(p)
@@ -25,77 +59,71 @@ local function handleEntity(p)
 		
 		send $ Chat $ format $ "{} is going to bed", ent.name
 	}
-	else
-	{
-		return moveEntity(_ents[EID], p)
-	}
 }
 
-@onMobSpawn
-@onNamedEntitySpawn
-@onPickupSpawn
-@onAddObject
-local function spawnEntity(p)
-{
-	local ent = {}
-	
-	if(p.packetID == PacketID.MobSpawn)
+@onEntityRelativeMove
+@onEntityLookRelativeMove
+@onEntityTeleport
+local function entityMove(p)=
+	modify(p.EID, \e
 	{
-		//writefln $ "MobSpawn EID: {} type: {} at {}/{}/{}", p.EID, MobType.toString(p.type), p.x / 32.0, p.y / 32.0, p.z / 32.0
-		
-		ent.yaw = p.yaw
-		ent.pitch = p.pitch
-		ent.type = p.type
-		ent.etype = EntityType.Mob
-		ent.metadata = metadata(p)
-	}
-	else if(p.packetID == PacketID.NamedEntitySpawn)
-	{
-		ent.name = p.name
-		ent.rotation = p.rotation
-		ent.pitch = p.pitch
-		ent.currentItem = p.currentItem
-		ent.etype = EntityType.Player
-	}
-	else if(p.packetID == PacketID.PickupSpawn)
-	{
-		//writefln $ "PickupSpawn EID: {} item: {} at {}/{}/{}", EID, p.itemID, p.x / 32.0, p.y / 32.0, p.z / 32.0
-		
-		ent.count = p.count
-		ent.itemID = p.itemID
-		ent.rotation = p.rotation
-		ent.pitch = p.pitch
-		ent.roll = p.roll
-		ent.damage = p.damage
-		ent.etype = EntityType.Pickup
-	}
-	else if(p.packetID == PacketID.AddObject)
-	{
-		ent.type = p.type
-		ent.etype = EntityType.Object
-	}
-	else
-	{
-		//writefln $ "Warning: unhandled entity spawn: {} EID: {} {}", PacketID.toString(p.packetID), p.EID
-		
-		ent = null
-		return
-	}
-	ent.EID = p.EID
-	ent.x = p.x
-	ent.y = p.y
-	ent.z = p.z
-	_ents[ent.EID] = ent
-	return true
-}
-
-onInit(\{
-	setTimer(1000, \{
-		foreach(k, v; _ents)
-		{
-			dumpVal  $ entities.get $ k
-			writefln $ "type: {}", EntityType.toString $ (entities.get $ k).etype
-			writeln  $ "======================================"
-		}
+		e.x += p.dX
+		e.y += p.dY
+		e.z += p.dZ
 	})
-})
+
+@onEntityLook
+@onEntityLookRelativeMove
+@onEntityTeleport
+local function entityLook(p) = 
+	modify(p.EID, \e{
+		e.yaw = p.yaw
+		e.pitch = p.pitch
+	})
+
+	
+onMobSpawn(\p->
+	new(p, \e{
+		e.yaw = p.yaw
+		e.pitch = p.pitch
+		e.type = p.type
+		e.etype = EntityType.Mob
+		e.metadata = metadata(p)
+	})
+)
+
+onNamedEntitySpawn(\p->
+	new(p, \e{
+		e.name = p.name
+		e.rotation = p.rotation
+		e.pitch = p.pitch
+		e.currentItem = p.currentItem
+		e.etype = EntityType.Player
+	})
+)
+
+onPickupSpawn(\p->
+	new(p, \e{
+		e.count = p.count
+		e.itemID = p.itemID
+		e.rotation = p.rotation
+		e.pitch = p.pitch
+		e.roll = p.roll
+		e.damage = p.damage
+		e.etype = EntityType.Pickup
+	})
+)
+
+onAddObject(\p->
+	new(p, \e{
+		e.type = p.type
+		e.etype = EntityType.Object
+	})
+)
+
+onEntityMetadata(\p->
+	modify(p.EID, \e
+	{
+		e.metadata = metadata(p)
+	})
+)
