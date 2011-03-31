@@ -11,7 +11,7 @@ import miney.util;
 
 pragma(lib, "zlib.lib");
 
-static const int ProtocolVersion = 9;
+static const int ProtocolVersion = 10;
 
 static char[] moduleName = "miney.protocol";
 
