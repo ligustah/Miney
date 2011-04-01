@@ -17,7 +17,7 @@ local function filterTable(t : table, pred : function)
 	return newTab
 }
 
-onDestroyEntity(\p{	_ents[p.EID] = null })
+afterDestroyEntity (\p{ _ents[p.EID] = null })
 
 global mobs		= \-> filterTable(_ents, \k,v->v.etype == EntityType.Mob)
 global pickups	= \-> filterTable(_ents, \k,v->v.etype == EntityType.Pickup)
@@ -44,6 +44,7 @@ global function new(p, extra : function)
 	ent.y = p.y
 	ent.z = p.z
 	ent.EID = EID
+	ent.block = \-> {x = ent.x / 32.0, y = ent.y / 32.0, z = ent.z / 32.0}
 	extra(ent)
 	_ents[EID] = ent
 }
@@ -63,7 +64,6 @@ local function handleEntity(p)
 
 @onEntityRelativeMove
 @onEntityLookRelativeMove
-@onEntityTeleport
 local function entityMove(p)=
 	modify(p.EID, \e
 	{
@@ -71,6 +71,15 @@ local function entityMove(p)=
 		e.y += p.dY
 		e.z += p.dZ
 	})
+	
+onEntityTeleport(\p{
+	modify(p.EID, \e
+	{
+		e.x = p.x
+		e.y = p.y
+		e.z = p.z
+	})
+})
 
 @onEntityLook
 @onEntityLookRelativeMove

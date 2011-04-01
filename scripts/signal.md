@@ -5,31 +5,53 @@ local signals = {}
 class Signal
 {
 	this()
-		:listeners = {}
-		
-	function add(f: function)
-		:listeners[f] = true
-
-	function opCall(vararg)
 	{
-		foreach(f, _; :listeners, "modify")
+		:on = {}
+		:after = {}
+	}
+		
+	function addOn(f: function)
+		:on[f] = true
+	
+	function addAfter(f: function)
+		:after[f] = true
+		
+	function _call(tab : table, vararg)
+	{
+		foreach(f, _; tab, "modify")
 		{
 			if(f(vararg))
 			{
-				:listeners[f] = null
+				tab[f] = null
 			}
 		}
+	}
+
+	function opCall(vararg)
+	{
+		:_call(:on, vararg)
+		:_call(:after, vararg)
 	}
 }
 
 global function add(name)
 {
-	local evName = "on" ~ name
+	if(name in signals)
+		return
+	local onName = "on" ~ name
+	local afterName = "after" ~ name
 	signals[name] = Signal()
 	
-	_G.(evName) = function(func: function)
+	_G.(onName) = function(func: function)
 	{
-		signals[name].add(func)
+		signals[name].addOn(func)
+		
+		return func
+	}
+	
+	_G.(afterName) = function(func: function)
+	{
+		signals[name].addAfter(func)
 		
 		return func
 	}
