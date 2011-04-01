@@ -1,5 +1,10 @@
 module miney.miney;
 
+version(build)
+{
+	pragma(link, DD-minid, tango);
+}
+
 import minid.api;
 import minid.bind;
 
@@ -29,6 +34,8 @@ import miney.timer;
 import miney.network;
 import miney.util;
 import bindings.all;
+
+debug import tango.core.tools.TraceExceptions;
 
 class Miney : ISelectable
 {
@@ -71,8 +78,8 @@ class Miney : ISelectable
 		this._port = port;
 		this._network = n;
 		this._socket = new Socket();
-		this._inBuffer = new Bin(_socket, 4096);
-		this._outBuffer = new Bout(_socket, 4096);
+		this._inBuffer = new Bin(_socket, 1024 * 10);
+		this._outBuffer = new Bout(_socket, 1024 * 4);
 		this._input = new MinecraftDataInput(_inBuffer);
 		this._output = new MinecraftDataOutput(_outBuffer);
 		this._vm = vm;
@@ -121,6 +128,7 @@ class Miney : ISelectable
 			Sendable s = superGet!(Sendable)(t, i);
 			if(s is null)
 				continue;
+			//Stdout.formatln("sending {}", s.classinfo.base.name);
 			m.queue(s);
 		}
 		
@@ -347,7 +355,8 @@ class Miney : ISelectable
 	}
 	
 	private void handlePacket(Receivable r)
-	{		
+	{
+		//Stdout.formatln("receiving {}", packetID2Name(r.packetID));
 		auto slot = lookupCT!("miney.onPacket")(_mainThread);
 		pushNull(_mainThread);
 		superPush!(Receivable)(_mainThread, r);
@@ -382,9 +391,11 @@ class Miney : ISelectable
 			return false;	// not enough data to parse
 		try
 		{
+			//Stdout.formatln("receiving {}", packetID2Name(_packet.packetID));
 			_packet.receive(_input);
 		}catch(IOException ioe)
 		{
+			//Stdout.formatln("exception while parsing({}): {}", _inBuffer.limit, ioe);
 			_inBuffer.skip(1 - _inBuffer.position);
 			return false;
 		}

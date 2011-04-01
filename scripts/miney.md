@@ -8,16 +8,8 @@ import hash
 
 local username = "Moep"
 local password = "Password"
-local host = "localhost"
+local host = "192.168.2.117"
 local port = 25565
-
-//padd username with null bytes
-//local needed = 256 - #username - #(" connected!")
-//username ~= string.joinArray $ array.new(needed, "\0")
-
-//append my packets
-//username ~= "\u00ff\u0000" ~ toChar(#message)
-//username ~= message
 
 import signal : emit
 
@@ -44,7 +36,7 @@ local function randomString(len : int = 10, colored : bool = false)
 	return buf.toString()
 }
 
-username = randomString()
+//username = randomString()
 
 global time_connected = 0
 global total_download = 0
@@ -63,22 +55,6 @@ local function printPosition(pos, fmt = "")
 	writefln $ "{} {}/{}/{}", fmt, pos.x, pos.y, pos.z
 }
 
-local function attackMobs()
-{
-	foreach(eid, ent; entities.mobs())
-	{
-		if(ent.etype != EntityType.Mob)
-			continue;
-		local dis = distance(position, ent)
-		
-		if(dis <= 4)
-		{
-			writefln $ "mob distance {}", dis
-			send(UseEntity(0, eid, true))
-		}
-	}
-}
-
 global function onInit()
 {
 	emit("Init")
@@ -93,6 +69,7 @@ global function onInit()
 
 global function onConnect(host, port)
 {
+	emit $ "Connect"
 	time_connected = timestamp()
 	writefln $ "connected!!! ({}:{})", host, port
 	
@@ -144,6 +121,7 @@ global function onConnect(host, port)
 global function onDisconnect()
 {
 	writeln $ "disconnected :("
+	emit $ "ConnectionClosed"
 }
 
 global function onPacket(packet)
@@ -181,5 +159,27 @@ global function update(download, upload)
 {
 	total_download += download
 	total_upload += upload
-	position.update()
 }
+
+onTimeUpdate(\p{
+	if(p.time % 24000 >= 12000)
+	{
+		send $ Chat $ "/time set 0"
+	}
+})
+
+onChat(\p->	writeln $ p.message)
+
+onLoginComplete(\{
+	local wolves = {}
+	setTimer(1000, \{
+		foreach(k, v; entities.mobs())
+		{
+			if(v.type == MobType.Wolf && k !in wolves)
+			{
+				wolves[k] = true
+				send $ Chat $ format $ "found wolf at {}/{}/{}", v.x / 32, v.y / 32, v.z / 32
+			}
+		}
+	})
+})

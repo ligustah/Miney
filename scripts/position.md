@@ -1,19 +1,18 @@
 module position
 
+import time
 import signal : emit
 signal.add("LoginComplete")
 
-global x, y, z, yaw, pitch, onGround
-
-local valid = false
+global x, y, z, yaw, pitch, onGround, stance
+local updateTimer
+local updates = 0
 
 function update()
 {
-	if(valid)
-	{
-		//writefln("sending position: {}/{}/{} {}", x, y, z, onGround)
-		send(PlayerPositionLook(x, y, z, y + 1.62, yaw, pitch, onGround))
-	}
+	//writefln("sending position: {}/{}/{} {}", x, y, z, onGround)
+	send(PlayerPositionLook(x, y, z, stance, yaw, pitch, onGround))
+	//send(Player(onGround))
 }
 
 function block()
@@ -28,7 +27,9 @@ local function ppl(p)
 	z = p.z
 	yaw = p.yaw
 	pitch = p.pitch
+	stance = p.stance
 	onGround = p.onGround
+	update()
 }
 
 onPlayerPositionLook(\p
@@ -36,6 +37,12 @@ onPlayerPositionLook(\p
 	ppl(p)
 	emit $ "LoginComplete"
 	onPlayerPositionLook(ppl)
+	updateTimer = setTimer(45,\{
+		update()
+	})
+	
+	writefln $ "y: {} stance: {}", y, stance
+	writefln $ "diff: {}", y - stance
 	
 	return true // remove this one
 })
