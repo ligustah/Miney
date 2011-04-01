@@ -10,6 +10,8 @@ import tango.core.Traits;
 import tango.core.Variant;
 import tango.core.Tuple;
 
+import Integer = tango.text.convert.Integer;
+
 import tango.util.container.LinkedList;
 
 import miney.miney;
@@ -67,7 +69,7 @@ class Network
 		while(true)
 		{
 			_scheduler.tick();
-			count = _selector.select(timeout);
+			count = _selector.select(0.01);
 			
 			if(count > 0)
 			{
@@ -264,6 +266,13 @@ class MinecraftDataInput : DataInput
 		return this;
 	}
 	
+	public typeof(this) get(out ubyte b)
+	{
+		b = cast(ubyte)getByte();
+		
+		return this;
+	}
+	
 	public typeof(this) get(out short s)
 	{
 		s = getShort();
@@ -299,6 +308,8 @@ class MinecraftDataInput : DataInput
 			
 			if(x == 0x7F) // end of metadata
 				break;
+			
+			continue;
 				
 			//Stdout.format("{}: ", n++);
 				
@@ -328,7 +339,7 @@ class MinecraftDataInput : DataInput
 					vars ~= Variant([Variant(getInt), Variant(getInt), Variant(getInt)]);
 					break;
 				default:
-					assert(0, "invalid metadata");
+					assert(0, "invalid metadata " ~ Integer.toString(y));
 			}
 		}
 		
@@ -366,6 +377,10 @@ interface Receivable
 
 class MetadataPacket
 {
+	public this()
+	{
+	}
+	
 	public Variant[] metadata()
 	{
 		assert(false, "not implemented");

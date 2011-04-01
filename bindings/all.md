@@ -277,7 +277,8 @@ global enums =
 			Sheep = 0x5b,
 			Cow = 0x5c,
 			Hen = 0x5d,
-			Squid = 0x5e
+			Squid = 0x5e,
+			Wolf = 0x5f
 		"
 		
 	WoolColor =

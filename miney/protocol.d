@@ -5,6 +5,7 @@ import tango.core.Variant;
 
 import tango.io.Stdout;
 import tango.io.compress.ZlibStream;
+import tango.io.device.Array;
 
 import miney.network;
 import miney.util;
@@ -197,7 +198,8 @@ enum MobType : byte
 	Sheep = 0x5b,
 	Cow = 0x5c,
 	Hen = 0x5d,
-	Squid = 0x5e
+	Squid = 0x5e,
+	Wolf = 0x5f
 }
 
 enum WoolColor : byte
@@ -1447,7 +1449,7 @@ class MapChunk : Receivable
 	
 	private int _x, _z, _size;
 	private short _y;
-	private byte _sizeX, _sizeY, _sizeZ;
+	private ubyte _sizeX, _sizeY, _sizeZ;
 	private byte[] _data;
 	
 	mixin(_getter!("x"));
@@ -1473,10 +1475,20 @@ class MapChunk : Receivable
 		|_sizeZ
 		|_size;
 		
+		_sizeX++;
+		_sizeY++;
+		_sizeZ++;
+		
 		byte[] compressed = new byte[_size];
-		_data = new byte[cast(uint)((_sizeX+1) * (_sizeY+1) * (_sizeZ+1) * 2.5)];
-		scope zip = new ZlibInput(input);
-		zip.read(_data);
+		
+		input.read(compressed);
+		
+		scope stream = new Array(compressed);
+		
+		//Stdout.formatln("mapchunk {}/{}/{} {} * {} * {} compressed: {}", x, y, z, _sizeX, _sizeY, _sizeZ, _size);
+				
+		_data = new byte[cast(uint)((_sizeX) * (_sizeY) * (_sizeZ) * 2.5)];
+		scope zip = new ZlibInput(stream);
 		
 		return minSize + _size;
 	}
@@ -1582,16 +1594,17 @@ class PlayNoteBlock : Receivable
 		return minSize;
 	}
 }
-
+struct Record
+{
+	byte x, y, z;
+}
+	
 class Explosion : Receivable
 {
 	mixin(_packetID!("Explosion"));
 	mixin(_minSize!(33));
 	
-	struct Record
-	{
-		byte x, y, z;
-	}
+
 		
 	private double _x, _y, _z;
 	private float _unknown;
@@ -1766,18 +1779,18 @@ class SetSlot : Receivable
 	}
 }
 
+struct Item
+{
+	short id;
+	byte count;
+	short uses;
+}
+
 class WindowItems : Receivable
 {
 	mixin(_packetID!("WindowItems"));
 	mixin(_minSize!(4));
-	
-	struct Item
-	{
-		short id;
-		byte count;
-		short uses;
-	}
-	
+		
 	private byte _id;
 	private short _count;
 	private Item[] _items;

@@ -63,7 +63,8 @@ void initMineyEnums(MDVM* vm)
 			WrapValue!("Sheep", MobType.Sheep),
 			WrapValue!("Cow", MobType.Cow),
 			WrapValue!("Hen", MobType.Hen),
-			WrapValue!("Squid", MobType.Squid)
+			WrapValue!("Squid", MobType.Squid),
+			WrapValue!("Wolf", MobType.Wolf)
 		),
 		WrapNamespace!(
 		"PacketID",
