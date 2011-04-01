@@ -1,0 +1,11 @@
+miney\miney.d
+miney\network.d
+miney\protocol.d
+miney\timer.d
+miney\util.d
+bindings\enums.d
+bindings\classes.d
+
+-I../minid/
+-explicit
+-Tminey
