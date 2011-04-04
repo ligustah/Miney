@@ -2,9 +2,6 @@ module all
 
 global classes = 
 {
-	Sendable =
-	{
-	}
 	KeepAlive = 
 	{
 		

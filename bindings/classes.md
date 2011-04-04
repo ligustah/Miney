@@ -63,7 +63,6 @@ void initMineyClasses(MDVM* vm)
 	WrapGlobals!(`);
 
 local cls = []
-cls ~= "WrapType!(MetadataPacket, \"MetadataPacket\")"
 
 foreach(name, params; all.classes)
 {
