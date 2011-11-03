@@ -2,13 +2,13 @@ module miney
 
 //standard library imports
 import math
-import time : timestamp
+import time : timestamp, microTime
 import os
 import hash
 
 local username = "Moep"
 local password = "Password"
-local host = "192.168.2.117"
+local host = "localhost"//"192.168.2.117"
 local port = 25565
 
 import signal : emit
@@ -22,7 +22,7 @@ import map
 import entities
 import mineyStrings
 
-local randomStringPool = [toChar(x) for x in 0 .. 128 if toChar(x).isAlNum()]
+local randomStringPool = [toChar(x) for x; 0 .. 128 if toChar(x).isAlNum()]
 
 local function randomString(len : int = 10, colored : bool = false)
 {	
@@ -36,7 +36,7 @@ local function randomString(len : int = 10, colored : bool = false)
 	return buf.toString()
 }
 
-//username = randomString()
+//username = "blaa"
 
 global time_connected = 0
 global total_download = 0
@@ -60,9 +60,9 @@ global function onInit()
 	emit("Init")
 	connect(host, port)
 	onHandshake(\p{
-		send(Login(username, "password"))
+		send(Login(username))
 		
-		//this only needs to be done once
+		//this needs to be done once only
 		return true
 	})
 }
@@ -71,51 +71,58 @@ global function onConnect(host, port)
 {
 	emit $ "Connect"
 	time_connected = timestamp()
-	writefln $ "connected!!! ({}:{})", host, port
+	writefln $ "connected!!!"
 	
 	send(Handshake(username))
-/+	setTimer(250, attackMobs)
+/*	setTimer(250, attackMobs)
 	setTimer(60000, function()
 	{
 		send $ Chat $ format $ "My health: {}", health
 	})
-+/
-/*
-	setTimer(1000, function()
+*/
+
+	local last = microTime()
+/*	setTimer(1000, function()
 	{
-		os.system("cls")
-		foreach(eid, ent; entities.mobs())
-		{		
-			if(ent.type == MobType.Sheep)
-			{
-				local meta = #ent.metadata >= 2 ? ent.metadata[1] : 0
-				writefln $ "{,7}: {,3}/{,3}/{,3} color: {,-9} sheared: {}", eid, ent.x / 32, ent.y / 32, ent.z / 32, WoolColor.toString(meta & 0xF), toBool(meta >> 4)
-			}
+//		os.system("cls")
+//		foreach(eid, ent; entities.mobs())
+//		{		
+//			if(ent.type == MobType.Sheep)
+//			{
+//				local meta = #ent.metadata >= 2 ? ent.metadata[1] : 0
+//				writefln $ "{,7}: {,3}/{,3}/{,3} color: {,-9} sheared: {}", eid, ent.x / 32, ent.y / 32, ent.z / 32, WoolColor.toString(meta & 0xF), toBool(meta >> 4)
+//			}
+//		}
+//		writeln  $ "---------------------------------------------------"
+		local now = microTime()
+		if(now - last >= 1_000_000)
+		{
+			local persecDown = total_download * 1.0 / (timestamp() - time_connected)
+			local persecUp = total_upload * 1.0 / (timestamp() - time_connected)
+			//writefln $ "connected: {}, now: {}, diff: {}", time_connected, 
+			writefln $ "{}kb/s down|{}kb/s up in {}s", toInt(persecDown / 1024 * 100) / 100.0, toInt(persecUp / 1024 * 100) / 100.0, timestamp() - time_connected
+			total_download = 0
+			total_upload = 0
+			last = now
 		}
-		writeln  $ "---------------------------------------------------"
-		local persecDown = total_download * 1.0 / (timestamp() - time_connected)
-		local persecUp = total_upload * 1.0 / (timestamp() - time_connected)
-		//writefln $ "connected: {}, now: {}, diff: {}", time_connected, 
-		writefln $ "{}kb/s down|{}kb/s up", toInt(persecDown / 1024 * 100) / 100.0, toInt(persecUp / 1024 * 100) / 100.0
-		
-		if(!position.valid)
-			return
-		writeln()
-		writefln $ "my position: {,3:f2}/{,3:f2}/{,3:f2}", position.x, position.y, position.z
+//		if(!position.valid)
+//			return
+//		writeln()
+//		writefln $ "my position: {,3:f2}/{,3:f2}/{,3:f2}", position.x, position.y, position.z
 	})
 */
-/+	setTimer(10000, function()
+/*	setTimer(10000, function()
 	{
 		local needed = 256 - #username - #("xx:xx <> ")
 		local msg = string.joinArray $ array.new(needed, "e")
-		local junk = packet_toString(Disconnect(message))
+		local junk = raw(Disconnect(message))
 		msg ~= string.joinArray $ array.new(10, junk)
-		msg ~= string.joinArray $ array.new(100, packet_toString $ KeepAlive())
+		msg ~= string.joinArray $ array.new(100, raw $ KeepAlive())
 		send(Chat(msg))
 		
 		return true
 	})
-+/
+*/
 }
 
 global function onDisconnect()
@@ -141,18 +148,20 @@ global function onPacket(packet)
 		case PacketID.UpdateHealth:
 			health = packet.health
 			break
+		case PacketID.Disconnect:
+			writefln $ "reason: {}", packet.reason
+			break
 		default:
 			//writefln $ "unhandled packet: {}", PacketID.toString(packet.packetID)
 			break
 	}
 	try
 		emit((PacketID.toString $ packet.packetID), packet)
-	catch(e)
+	catch(e : Exception)
 	{
 		writeln("caught exception: ", e)
-		writeln(thread.traceback())
+		writeln(e.tracebackString())
 	}
-
 }
 
 global function update(download, upload)
@@ -170,16 +179,8 @@ onTimeUpdate(\p{
 
 onChat(\p->	writeln $ p.message)
 
-onLoginComplete(\{
-	local wolves = {}
-	setTimer(1000, \{
-		foreach(k, v; entities.mobs())
-		{
-			if(v.type == MobType.Wolf && k !in wolves)
-			{
-				wolves[k] = true
-				send $ Chat $ format $ "found wolf at {}/{}/{}", v.x / 32, v.y / 32, v.z / 32
-			}
-		}
-	})
+onKeepAlive(send)  //simply return that keepalive back to the server
+
+onMapDownloadFinished(\{
+	send $ Chat $ "Map download finished"
 })

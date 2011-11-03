@@ -1,0 +1,47 @@
+module map
+
+import time
+
+local count = 0
+local preCount = 0
+local finished = false
+
+import signal : emit
+signal.add("MapDownloadFinished")
+
+class Chunk
+{
+	x
+	y
+	data	
+	
+	this(x, z, sizeX, sizeY, sizeZ, data)
+	{
+		
+	}
+}
+
+@onMapChunk
+local function mapChunk(p)
+{
+	count++
+	//writefln $ "mapchunk {} {} * {} * {}", count, p.sizeX, p.sizeY, p.sizeZ
+	
+	//writefln $ "mapchunk: {}", p.size
+	
+	if(count == preCount)
+	{
+		finished = true
+		emit("MapDownloadFinished")
+		return true
+	}
+}
+
+
+@onPreChunk
+local function preChunk(packet)
+{
+	if(finished)
+		return true
+	preCount++
+}

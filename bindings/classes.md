@@ -47,7 +47,7 @@ function makeProperties(name : string, cl : table)
 	return string.joinArray(p, ", ")
 }
 
-file.write(`
+file.write(@"
 module bindings.classes;
 
 import minid.bind;
@@ -60,7 +60,7 @@ void initMineyClasses(MDVM* vm)
 {
 	MDThread* t = mainThread(vm);
 	
-	WrapGlobals!(`);
+	WrapGlobals!(");
 
 local cls = []
 
@@ -70,21 +70,21 @@ foreach(name, params; all.classes)
 	local props = makeProperties(name, params)
 	local ctors = makeCtors(params)
 	
-	cl = format(`
+	cl = format(@"
 		WrapType!(
 			{},
-			"{}",
-			{}`, name, name, ctors)
-	cl ~= format(`
+			`{}`,
+			{}", name, name, ctors)
+	cl ~= format(@"
 			{}
-		)`, props)
+		)", props)
 
 	cls ~= cl
 }
 
 file.write(string.joinArray(cls, ","))
-file.write(`
+file.write(@"
 	)(t);
-}`);
+}");
 
 file.close()

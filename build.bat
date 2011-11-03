@@ -1,1 +1,1 @@
-dmd -run cdc -I..\minid -L+..\minid\ -L+DD-minid.lib -ofminey miney bindings
+dmd -run cdc -I..\Croc -L+..\Croc\ -X -L+DD-croc.lib -g -debug -ofminey miney bindings

@@ -41,8 +41,5 @@ onPlayerPositionLook(\p
 		update()
 	})
 	
-	writefln $ "y: {} stance: {}", y, stance
-	writefln $ "diff: {}", y - stance
-	
 	return true // remove this one
 })

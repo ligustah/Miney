@@ -10,28 +10,27 @@ import tango.io.Stdout;
 struct MDAction
 {
 	Action action;
-	ulong mdRef;
+	ulong crocRef;
 	
 	static MDAction opCall(ulong r)
 	{
 		MDAction a;
 		
-		a.mdRef = r;
+		a.crocRef = r;
 		
 		return a;
 	}
 }
 */
 
-/* for some weird reason this would't work as a struct */
-class MDAction
+class CrocAction
 {
 	Action action;
-	ulong mdRef;
+	ulong crocRef;
 	
-	this(ulong mdRef)
+	this(ulong crocRef)
 	{
-		this.mdRef = mdRef;
+		this.crocRef = crocRef;
 	}
 }
 

@@ -1,5 +1,12 @@
 module miney.protocol;
 
+import tango.core.ByteSwap;
+
+import tango.io.stream.Data;
+
+import Integer = tango.text.convert.Integer;
+import UTF = tango.text.convert.Utf;
+
 import tango.core.Traits;
 import tango.core.Variant;
 
@@ -7,12 +14,299 @@ import tango.io.Stdout;
 import tango.io.compress.ZlibStream;
 import tango.io.device.Array;
 
-import miney.network;
 import miney.util;
+
+interface Sendable
+{
+	public void send(MinecraftDataOutput);
+	public PacketID packetID();
+}
+
+interface Receivable
+{
+	public PacketID packetID();
+	
+	/**
+		the number of bytes this packet contains _excluding_ the packet id
+	*/
+	public size_t minSize();
+	
+	public int receive(MinecraftDataInput);
+}
+
+interface MetadataPacket
+{
+	public Metadata[] metadata();
+}
+
+class Metadata
+{
+	private byte _key;
+	private Variant _value;
+	
+	mixin(_getter!("key", "value"));
+	
+	this(byte key, Variant value)
+	{
+		this._key = key;
+		this._value = value;
+	}
+}
+
+class MinecraftDataOutput : DataOutput
+{
+	this(OutputStream outs)
+	{
+		super(outs);
+		endian(Network);
+	}
+		
+	public size_t string8(char[] str)
+	{
+		int16(str.length);
+		return write(str);
+	}
+	
+	public size_t string16(wchar[] str)
+	{
+		int16(str.length);
+		version(LittleEndian) ByteSwap.swap16(str);
+		return write(str);
+	}
+	
+	public typeof(this) put(char[] str)
+	{
+		put(UTF.toString16(str));
+		
+		return this;
+	}
+	
+	public typeof(this) put(wchar[] str)
+	{
+		string16(str);
+		
+		return this;
+	}
+	
+	public typeof(this) put(bool b)
+	{
+		putBool(b);
+		
+		return this;
+	}
+	
+	public typeof(this) put(int i)
+	{
+		putInt(i);
+		
+		return this;
+	}
+	
+	public typeof(this) put(long l)
+	{
+		putLong(l);
+		
+		return this;
+	}
+	
+	public typeof(this) put(short s)
+	{
+		putShort(s);
+		
+		return this;
+	}
+	
+	public typeof(this) put(float f)
+	{
+		putFloat(f);
+		
+		return this;
+	}
+	
+	public typeof(this) put(double d)
+	{
+		putFloat(d);
+		
+		return this;
+	}
+	
+	public typeof(this) put(byte b)
+	{
+		putByte(b);
+		
+		return this;
+	}
+	
+	public typeof(this) put(PacketID id)
+	{
+		putByte(id);
+		
+		return this;
+	}
+	
+	public typeof(this) put(Sendable s)
+	{
+		put(s.packetID);
+		s.send(this);
+		
+		return this;
+	}
+	
+	public alias put opOr;
+}
+
+class MinecraftDataInput : DataInput
+{
+	this(InputStream ins)
+	{
+		super(ins);
+		endian(Network);
+	}
+
+	public char[] string8()
+	{
+		return UTF.toString(string16());
+	}
+
+	public wchar[] string16()
+	{
+		short len = int16;
+		wchar[] str = new wchar[len];
+		read(cast(void[])str);
+		version(LittleEndian) ByteSwap.swap16(str);
+		
+		return str;
+	}
+	
+	public typeof(this) get(out char[] str)
+	{
+		str = string8();
+		
+		return this;
+	}
+	
+	public typeof(this) get(out wchar[] str)
+	{
+		str = string16();
+		
+		return this;
+	}
+	
+	public typeof(this) get(out bool b)
+	{
+		b = getBool();
+		
+		return this;
+	}
+	
+	public typeof(this) get(out int i)
+	{
+		i = getInt();
+		
+		return this;
+	}
+	
+	public typeof(this) get(out long l)
+	{
+		l = getLong();
+		
+		return this;
+	}
+	
+	public typeof(this) get(out byte b)
+	{
+		b = getByte();
+		
+		return this;
+	}
+	
+	public typeof(this) get(out ubyte b)
+	{
+		b = cast(ubyte)getByte();
+		
+		return this;
+	}
+	
+	public typeof(this) get(out short s)
+	{
+		s = getShort();
+		
+		return this;
+	}
+	
+	public typeof(this) get(out float f)
+	{
+		f = getFloat();
+		
+		return this;
+	}
+	
+	public typeof(this) get(out double d)
+	{
+		d = getDouble();
+		
+		return this;
+	}
+	
+	public alias get opOr;
+	
+	public Metadata[] metadata()
+	{
+		Metadata[] vars;
+		ubyte x;
+		int n = 0;
+		byte[] data;
+		
+		while(true)
+		{
+			this|x;
+			
+			data ~= x;
+			
+			if(x == 0x7F) // end of metadata
+				break;
+				
+			//Stdout.format("{}: ", n++);
+				
+			byte y = x >> 5;
+			byte key = x & 0x1E;
+			
+			switch(y)
+			{
+				case 0:
+					vars ~= new Metadata(key, Variant(getByte));
+					break;
+				case 1:
+					vars ~= new Metadata(key, Variant(getShort));
+					break;
+				case 2:
+					vars ~= new Metadata(key, Variant(getInt));
+					break;
+				case 3:
+					vars ~= new Metadata(key, Variant(getFloat));
+					break;
+				case 4:
+					vars ~= new Metadata(key, Variant(string8));
+					break;
+				case 5:
+					vars ~= new Metadata(key, Variant([Variant(getShort), Variant(getByte), Variant(getShort)]));
+					break;
+				case 6:
+					vars ~= new Metadata(key, Variant([Variant(getInt), Variant(getInt), Variant(getInt)]));
+					break;
+				default:
+					Stdout.formatln("data: {}", data);
+					assert(0, "invalid metadata " ~ Integer.toString(y));
+			}
+		}
+		
+		return vars;
+	}
+}
 
 pragma(lib, "zlib.lib");
 
-static const int ProtocolVersion = 10;
+static const int ProtocolVersion = 17;
 
 static char[] moduleName = "miney.protocol";
 
@@ -122,6 +416,7 @@ enum PacketID : ubyte
 	AddObject = 0x17,
 	MobSpawn = 0x18,
 	EntityPainting = 0x19,
+	ExperienceOrb = 0x1A,
 	Unknown = 0x1B,
 	EntityVelocity = 0x1C,
 	DestroyEntity = 0x1D,
@@ -133,12 +428,18 @@ enum PacketID : ubyte
 	EntityStatus = 0x26,
 	AttachEntity = 0x27,
 	EntityMetadata = 0x28,
+	EntityEffect = 0x29,
+	RemoveEntityEffect = 0x2A,
+	Experience = 0x2B,
 	PreChunk = 0x32,
 	MapChunk = 0x33,
 	MultiBlockChange = 0x34,
 	BlockChange = 0x35,
-	PlayNoteBlock = 0x36,
+	BlockAction = 0x36,
 	Explosion = 0x3C,
+	SoundEffect = 0x3D,
+	NewState = 0x46,
+	Thunderbolt = 0x47,
 	OpenWindow = 0x64,
 	CloseWindow = 0x65,
 	WindowClick = 0x66,
@@ -146,7 +447,12 @@ enum PacketID : ubyte
 	WindowItems = 0x68,
 	UpdateProgress = 0x69,
 	Transaction = 0x6A,
+	CreativeInventoryAction = 0x6B,
 	UpdateSign = 0x82,
+	ItemData = 0x83,
+	IncrementStatistic = 0xC8,
+	PlayerListItem = 0xC9,
+	ServerListPing = 0xFE,
 	Disconnect = 0xFF
 }
 
@@ -251,7 +557,9 @@ enum EntAction : byte
 {
 	Crouch = 0x01,
 	Uncrouch = 0x02,
-	LeaveBed = 0x03
+	LeaveBed = 0x03,
+	StartSprinting = 0x04,
+	StopSprinting = 0x05
 }
 
 /*
@@ -264,27 +572,41 @@ enum AuthCode
 class KeepAlive : Sendable, Receivable
 {	
 	mixin(_packetID!("KeepAlive"));
-	mixin(_minSize!(1));
+	mixin(_minSize!(4));
+	
+	private int _id;
+	
+	mixin(_getter!("id"));
+	
+	public this()
+	{
+		this(0);
+	}
+	
+	public this(int id)
+	{
+		this._id = id;
+	}
 	
 	public int receive(MinecraftDataInput input)
 	{
+		input
+		|_id;
+		
 		return minSize;
 	}
 	
 	public void send(MinecraftDataOutput output)
 	{
-		//nothing to do here
-	}
-	
-	public this()
-	{
+		output
+		|_id;
 	}
 }
 
 class Login : Sendable, Receivable
 {
 	mixin(_packetID!("Login"));
-	mixin(_minSize!(18));
+	mixin(_minSize!(22));
 	
 	union
 	{
@@ -292,17 +614,17 @@ class Login : Sendable, Receivable
 		private int _EID;
 	}
 	private char[] _username;
-	private char[] _password;
 	private long _mapSeed;
-	private byte _dimension;
+	private int _mode;
+	private byte _dimension, _difficulty;
+	private ubyte _height, _maxPlayers;
 		
-	mixin(_getter!("EID", "mapSeed", "dimension"));
+	mixin(_getter!("EID", "mapSeed", "dimension", "difficulty", "mode", "height", "maxPlayers"));
 	
-	public this(char[] username, char[] password)
+	public this(char[] username)
 	{
 		this._protocolVersion = ProtocolVersion;
 		this._username = username;
-		this._password = password;
 	}
 	
 	public this()
@@ -315,21 +637,27 @@ class Login : Sendable, Receivable
 		input
 		|_EID
 		|_username
-		|_password
 		|_mapSeed
-		|_dimension;
+		|_mode
+		|_dimension
+		|_difficulty
+		|_height
+		|_maxPlayers;
 		
-		return minSize + _username.length + _password.length;
+		return minSize + 2 * _username.length;
 	}
 	
 	public void send(MinecraftDataOutput output)
 	{
 		output
 		|_protocolVersion
-		|_username
-		|_password;
+		|_username;
 		
 		output.putLong(0);
+		output.putInt(0);
+		output.putByte(0);
+		output.putByte(0);
+		output.putByte(0);
 		output.putByte(0);
 	}
 }
@@ -337,7 +665,7 @@ class Login : Sendable, Receivable
 class Handshake : Sendable, Receivable
 {
 	mixin(_packetID!("Handshake"));
-	mixin(_minSize!(3));
+	mixin(_minSize!(2));
 	
 	union
 	{
@@ -367,14 +695,14 @@ class Handshake : Sendable, Receivable
 		input
 		|_connectionHash;
 		
-		return minSize + _connectionHash.length;
+		return minSize + 2 * _connectionHash.length;
 	}
 }
 
 class Chat : Sendable, Receivable
 {
 	mixin(_packetID!("Chat"));
-	mixin(_minSize!(3));
+	mixin(_minSize!(2));
 
 	char[] _message;
 	
@@ -395,7 +723,7 @@ class Chat : Sendable, Receivable
 		input
 		|_message;
 		
-		return minSize + _message.length;
+		return minSize + 2 * _message.length;
 	}
 	
 	public void send(MinecraftDataOutput output)
@@ -408,7 +736,7 @@ class Chat : Sendable, Receivable
 class TimeUpdate : Receivable
 {
 	mixin(_packetID!("TimeUpdate"));
-	mixin(_minSize!(9));
+	mixin(_minSize!(8));
 
 	private long _time;
 	
@@ -429,7 +757,7 @@ class TimeUpdate : Receivable
 
 class EntityEquipment : Receivable
 {
-	mixin(_minSize!(11));
+	mixin(_minSize!(10));
 	mixin(_packetID!("EntityEquipment"));
 	
 	private int _EID;
@@ -456,7 +784,7 @@ class EntityEquipment : Receivable
 
 class SpawnPosition : Receivable
 {
-	mixin(_minSize!(13));
+	mixin(_minSize!(12));
 	mixin(_packetID!("SpawnPosition"));
 	
 	private int _x, _y, _z;
@@ -479,7 +807,7 @@ class SpawnPosition : Receivable
 class UseEntity : Sendable, Receivable
 {
 	mixin(_packetID!("UseEntity"));
-	mixin(_minSize!(10));
+	mixin(_minSize!(9));
 	
 	private int _user, _target;
 	private bool _leftClick;
@@ -521,16 +849,19 @@ class UseEntity : Sendable, Receivable
 class UpdateHealth : Receivable
 {	
 	mixin(_packetID!("UpdateHealth"));
-	mixin(_minSize!(3));
+	mixin(_minSize!(8));
 	
-	private short _health;
+	private short _health, _food;
+	private float _saturation;
 	
-	mixin(_getter!("health"));
+	mixin(_getter!("health", "food", "saturation"));
 	
 	public int receive(MinecraftDataInput input)
 	{
 		input
-		|_health;
+		|_health
+		|_food
+		|_saturation;
 		
 		return minSize;
 	}
@@ -538,17 +869,48 @@ class UpdateHealth : Receivable
 
 class Respawn : Sendable, Receivable
 {
-	mixin(_minSize!(1));
+	mixin(_minSize!(13));
 	mixin(_packetID!("Respawn"));
+	
+	private byte  _world, _difficulty, _creative;
+	private short _height;
+	private long  _seed;
+	
+	mixin(_getter!("world", "difficulty", "creative", "height", "seed"));
+	
+	public this()
+	{
+	}
+	
+	public this(byte world, byte difficulty, byte creative, short height, long seed)
+	{
+		this._world = world;
+		this._difficulty = difficulty;
+		this._creative = creative;
+		this._height = height;
+		this._seed = seed;
+	}
 	
 	public int receive(MinecraftDataInput input)
 	{
+		input
+		|_world
+		|_difficulty
+		|_creative
+		|_height
+		|_seed;
+		
 		return minSize;
 	}
 	
 	public void send(MinecraftDataOutput output)
-	{
-		// nothing to do here
+	{		
+		output
+		|_world
+		|_difficulty
+		|_creative
+		|_height
+		|_seed;
 	}
 }
 
@@ -624,7 +986,7 @@ class PlayerLook : Sendable
 class PlayerPositionLook : Sendable, Receivable
 {
 	mixin(_packetID!("PlayerPositionLook"));
-	mixin(_minSize!(42));
+	mixin(_minSize!(41));
 
 	private double _x, _y, _z, _stance;
 	private float _yaw, _pitch;
@@ -718,7 +1080,7 @@ class PlayerDigging : Sendable
 class PlayerBlockPlacement : Sendable, Receivable
 {
 	mixin(_packetID!("PlayerBlockPlacement"));
-	mixin(_minSize!(13));
+	mixin(_minSize!(12));
 	
 	private int _x, _z;
 	private byte _y, _direction, _amount;
@@ -726,14 +1088,7 @@ class PlayerBlockPlacement : Sendable, Receivable
 	private alias _block _itemID;
 	private short _damage;
 	
-	mixin(_getter!("x"));
-	mixin(_getter!("y"));
-	mixin(_getter!("z"));
-	mixin(_getter!("direction"));
-	mixin(_getter!("amount"));
-	mixin(_getter!("block"));
-	mixin(_getter!("itemID"));
-	mixin(_getter!("damage"));
+	mixin(_getter!("x", "y", "z", "direction", "amount", "block", "itemID", "damage"));
 	
 	public this()
 	{
@@ -783,12 +1138,9 @@ class PlayerBlockPlacement : Sendable, Receivable
 
 class HoldingChange : Sendable
 {
+	mixin(_packetID!("HoldingChange"));
+
 	private short _slotID;
-	
-	public PacketID packetID()
-	{
-		return PacketID.HoldingChange;
-	}
 	
 	public this(short slotID)
 	{
@@ -805,7 +1157,7 @@ class HoldingChange : Sendable
 class UseBed : Receivable
 {
 	mixin(_packetID!("UseBed"));
-	mixin(_minSize!(15));
+	mixin(_minSize!(14));
 	
 	private int _EID, _x, _z;
 	private byte _unknown, _y;
@@ -830,7 +1182,7 @@ class UseBed : Receivable
 
 class Animation : Sendable, Receivable
 {
-	mixin(_minSize!(6));
+	mixin(_minSize!(5));
 	mixin(_packetID!("Animation"));
 	
 	private int _EID;
@@ -869,7 +1221,7 @@ class Animation : Sendable, Receivable
 
 class EntityAction : Sendable, Receivable
 {
-	mixin(_minSize!(6));
+	mixin(_minSize!(5));
 	mixin(_packetID!("EntityAction"));
 	
 	private int _EID;
@@ -908,21 +1260,14 @@ class EntityAction : Sendable, Receivable
 class NamedEntitySpawn : Receivable
 {
 	mixin(_packetID!("NamedEntitySpawn"));
-	mixin(_minSize!(23));
+	mixin(_minSize!(22));
 	
 	private int _EID, _x, _y, _z;
 	private char[] _name;
 	private byte _rotation, _pitch;
 	private short _currentItem;
 	
-	mixin(_getter!("EID"));
-	mixin(_getter!("x"));
-	mixin(_getter!("y"));
-	mixin(_getter!("z"));
-	mixin(_getter!("name"));
-	mixin(_getter!("rotation"));
-	mixin(_getter!("pitch"));
-	mixin(_getter!("currentItem"));
+	mixin(_getter!("EID", "x", "y", "z", "name", "rotation", "pitch", "currentItem"));
 	
 	public this()
 	{
@@ -940,29 +1285,20 @@ class NamedEntitySpawn : Receivable
 		|_pitch
 		|_currentItem;
 		
-		return minSize + _name.length;
+		return minSize + 2 * _name.length;
 	}
 }
 
 class PickupSpawn : Receivable
 {
 	mixin(_packetID!("PickupSpawn"));
-	mixin(_minSize!(25));
+	mixin(_minSize!(24));
 	
 	private int _EID, _x, _y, _z;
 	private byte _count, _rotation, _pitch, _roll;
 	private short _itemID, _damage;
 	
-	mixin(_getter!("EID"));
-	mixin(_getter!("x"));
-	mixin(_getter!("y"));
-	mixin(_getter!("z"));
-	mixin(_getter!("count"));
-	mixin(_getter!("rotation"));
-	mixin(_getter!("pitch"));
-	mixin(_getter!("roll"));
-	mixin(_getter!("itemID"));
-	mixin(_getter!("damage"));
+	mixin(_getter!("EID", "x", "y", "z", "count", "rotation", "pitch", "roll", "itemID", "damage"));
 	
 	public this()
 	{
@@ -989,12 +1325,11 @@ class PickupSpawn : Receivable
 class CollectItem : Receivable
 {
 	mixin(_packetID!("CollectItem"));
-	mixin(_minSize!(9));
+	mixin(_minSize!(8));
 	
 	private int _collected, _collector;
 	
-	mixin(_getter!("collected"));
-	mixin(_getter!("collector"));
+	mixin(_getter!("collected", "collector"));
 	
 	public this()
 	{
@@ -1013,16 +1348,13 @@ class CollectItem : Receivable
 class AddObject : Receivable
 {
 	mixin(_packetID!("AddObject"));
-	mixin(_minSize!(18));
+	mixin(_minSize!(21));
 	
-	private int _EID, _x, _y, _z;
+	private int _EID, _x, _y, _z, _thrower;
+	private short _tx, _ty, _tz;
 	private byte _type;
 	
-	mixin(_getter!("EID"));
-	mixin(_getter!("x"));
-	mixin(_getter!("y"));
-	mixin(_getter!("z"));
-	mixin(_getter!("type"));
+	mixin(_getter!("EID", "x", "y", "z", "type", "thrower", "tx", "ty", "tz"));
 	
 	public this()
 	{
@@ -1035,13 +1367,23 @@ class AddObject : Receivable
 		|_type
 		|_x
 		|_y
-		|_z;
+		|_z
+		|_thrower;
+		
+		if(_thrower > 0)
+		{
+			input
+			|_tx
+			|_ty
+			|_tz;
+			
+			return minSize + 6; // (3 * short = 6 bytes)
+		}
 		
 		return minSize;
 	}
 }
 
-// TODO metadata
 class MobSpawn : MetadataPacket, Receivable
 {
 	mixin(_packetID!("MobSpawn"));
@@ -1050,15 +1392,9 @@ class MobSpawn : MetadataPacket, Receivable
 	int _EID, _x, _y, _z;
 	byte _type, _yaw, _pitch;
 	
-	mixin(_getter!("EID"));
-	mixin(_getter!("x"));
-	mixin(_getter!("y"));
-	mixin(_getter!("z"));
-	mixin(_getter!("type"));
-	mixin(_getter!("yaw"));
-	mixin(_getter!("pitch"));
+	mixin(_getter!("EID", "x", "y", "z", "type", "yaw", "pitch"));
 	
-	Variant[] _metadata;
+	Metadata[] _metadata;
 	mixin(_getter!("metadata"));
 	
 	public this()
@@ -1086,17 +1422,12 @@ class MobSpawn : MetadataPacket, Receivable
 class EntityPainting : Receivable
 {
 	mixin(_packetID!("EntityPainting"));
-	mixin(_minSize!(23));
+	mixin(_minSize!(22));
 	
 	private int _EID, _x, _y, _z, _type;
 	private char[] _title;
 	
-	mixin(_getter!("EID"));
-	mixin(_getter!("x"));
-	mixin(_getter!("y"));
-	mixin(_getter!("z"));
-	mixin(_getter!("type"));
-	mixin(_getter!("title"));
+	mixin(_getter!("EID", "x", "y", "z", "type", "title"));
 	
 	public this()
 	{
@@ -1111,6 +1442,33 @@ class EntityPainting : Receivable
 		|_y
 		|_z
 		|_type;
+		
+		return minSize;
+	}
+}
+
+class ExperienceOrb : Receivable
+{
+	mixin(_packetID!("ExperienceOrb"));
+	mixin(_minSize!(18));
+	
+	private int _EID, _x, _y, _z;
+	private short _count;
+	
+	mixin(_getter!("EID", "x", "y", "z", "count"));
+	
+	public this()
+	{
+	}
+	
+	public int receive(MinecraftDataInput input)
+	{
+		input
+		|_EID
+		|_x
+		|_y
+		|_z
+		|_count;
 		
 		return minSize;
 	}
@@ -1145,15 +1503,12 @@ class Unknown : Receivable
 class EntityVelocity : Receivable
 {
 	mixin(_packetID!("EntityVelocity"));
-	mixin(_minSize!(11));
+	mixin(_minSize!(10));
 	
 	private int _EID;
 	private short _x, _y, _z;
 	
-	mixin(_getter!("EID"));
-	mixin(_getter!("x"));
-	mixin(_getter!("y"));
-	mixin(_getter!("z"));
+	mixin(_getter!("EID", "x", "y", "z"));
 	
 	public this()
 	{
@@ -1174,7 +1529,7 @@ class EntityVelocity : Receivable
 class DestroyEntity : Receivable
 {
 	mixin(_packetID!("DestroyEntity"));
-	mixin(_minSize!(5));
+	mixin(_minSize!(4));
 	
 	private int _EID;
 	
@@ -1196,7 +1551,7 @@ class DestroyEntity : Receivable
 class Entity : Receivable
 {
 	mixin(_packetID!("Entity"));
-	mixin(_minSize!(5));
+	mixin(_minSize!(4));
 	
 	private int _EID;
 	
@@ -1218,15 +1573,12 @@ class Entity : Receivable
 class EntityRelativeMove : Receivable
 {
 	mixin(_packetID!("EntityRelativeMove"));
-	mixin(_minSize!(8));
+	mixin(_minSize!(7));
 	
 	private int _EID;
 	byte _dX, _dY, _dZ;
 	
-	mixin(_getter!("EID"));
-	mixin(_getter!("dX"));
-	mixin(_getter!("dY"));
-	mixin(_getter!("dZ"));
+	mixin(_getter!("EID", "dX", "dY", "dZ"));
 	
 	public this()
 	{
@@ -1247,14 +1599,12 @@ class EntityRelativeMove : Receivable
 class EntityLook : Receivable
 {
 	mixin(_packetID!("EntityLook"));
-	mixin(_minSize!(7));
+	mixin(_minSize!(6));
 	
 	private int _EID;
 	private byte _yaw, _pitch;
 	
-	mixin(_getter!("EID"));
-	mixin(_getter!("yaw"));
-	mixin(_getter!("pitch"));
+	mixin(_getter!("EID", "yaw", "pitch"));
 	
 	public this()
 	{
@@ -1274,17 +1624,12 @@ class EntityLook : Receivable
 class EntityLookRelativeMove : Receivable
 {
 	mixin(_packetID!("EntityLookRelativeMove"));
-	mixin(_minSize!(10));
+	mixin(_minSize!(9));
 	
 	private int _EID;
 	private byte _dX, _dY, _dZ, _yaw, _pitch;
 	
-	mixin(_getter!("EID"));
-	mixin(_getter!("dX"));
-	mixin(_getter!("dY"));
-	mixin(_getter!("dZ"));
-	mixin(_getter!("yaw"));
-	mixin(_getter!("pitch"));
+	mixin(_getter!("EID", "dX", "dY", "dZ", "yaw", "pitch"));
 	
 	public this()
 	{
@@ -1307,17 +1652,12 @@ class EntityLookRelativeMove : Receivable
 class EntityTeleport : Receivable
 {
 	mixin(_packetID!("EntityTeleport"));
-	mixin(_minSize!(19));
+	mixin(_minSize!(18));
 	
 	private int _EID, _x, _y, _z;
 	private byte _yaw, _pitch;
 	
-	mixin(_getter!("EID"));
-	mixin(_getter!("x"));
-	mixin(_getter!("y"));
-	mixin(_getter!("z"));
-	mixin(_getter!("yaw"));
-	mixin(_getter!("pitch"));
+	mixin(_getter!("EID", "x", "y", "z", "yaw", "pitch"));
 	
 	public this()
 	{
@@ -1340,13 +1680,12 @@ class EntityTeleport : Receivable
 class EntityStatus : Receivable
 {
 	mixin(_packetID!("EntityStatus"));
-	mixin(_minSize!(6));
+	mixin(_minSize!(5));
 
 	private int _EID;
 	private byte _status;
 	
-	mixin(_getter!("EID"));
-	mixin(_getter!("status"));
+	mixin(_getter!("EID", "status"));
 	
 	public this()
 	{
@@ -1365,12 +1704,11 @@ class EntityStatus : Receivable
 class AttachEntity : Receivable
 {
 	mixin(_packetID!("AttachEntity"));
-	mixin(_minSize!(9));
+	mixin(_minSize!(8));
 	
 	private int _EID, _vehicle;
 	
-	mixin(_getter!("EID"));
-	mixin(_getter!("vehicle"));
+	mixin(_getter!("EID", "vehicle"));
 	
 	public this()
 	{
@@ -1389,13 +1727,13 @@ class AttachEntity : Receivable
 class EntityMetadata : MetadataPacket, Receivable
 {
 	mixin(_packetID!("EntityMetadata"));
-	mixin(_minSize!(5));
+	mixin(_minSize!(4));
 	
 	private int _EID;
 	
 	mixin(_getter!("EID"));
 	
-	Variant[] _metadata;
+	Metadata[] _metadata;
 	mixin(_getter!("metadata"));
 	
 	public this()
@@ -1413,17 +1751,79 @@ class EntityMetadata : MetadataPacket, Receivable
 	}
 }
 
+class EntityEffect : Receivable
+{
+	mixin(_packetID!("EntityEffect"));
+	mixin(_minSize!(8));
+	
+	private int _EID;
+	private byte _effect, _amplifier;
+	private short _duration;
+	
+	mixin(_getter!("EID", "effect", "amplifier", "duration"));
+	
+	public int receive(MinecraftDataInput input)
+	{
+		input
+		|_EID
+		|_effect
+		|_amplifier
+		|_duration;
+		
+		return minSize;
+	}
+}
+
+class RemoveEntityEffect : Receivable
+{
+	mixin(_packetID!("RemoveEntityEffect"));
+	mixin(_minSize!(5));
+	
+	private int _EID;
+	private byte _effect;
+	
+	mixin(_getter!("EID", "effect"));
+	
+	public int receive(MinecraftDataInput input)
+	{
+		input
+		|_EID
+		|_effect;
+		
+		return minSize;
+	}
+}
+
+class Experience : Receivable
+{
+	mixin(_packetID!("Experience"));
+	mixin(_minSize!(4));
+	
+	private byte _current, _level;
+	private short _total;
+	
+	mixin(_getter!("current", "level", "total"));
+	
+	public int receive(MinecraftDataInput input)
+	{
+		input
+		|_current
+		|_level
+		|_total;
+		
+		return minSize;
+	}
+}
+
 class PreChunk : Receivable
 {
 	mixin(_packetID!("PreChunk"));
-	mixin(_minSize!(10));
+	mixin(_minSize!(9));
 	
 	private int _x, _y;
 	private bool _mode;
 	
-	mixin(_getter!("x"));
-	mixin(_getter!("y"));
-	mixin(_getter!("mode"));
+	mixin(_getter!("x", "y", "mode"));
 	
 	public this()
 	{
@@ -1445,20 +1845,19 @@ class PreChunk : Receivable
 class MapChunk : Receivable
 {
 	mixin(_packetID!("MapChunk"));
-	mixin(_minSize!(18));
+	//mixin(_minSize!(18));
 	
-	private int _x, _z, _size;
+	public size_t minSize()
+	{
+		return 18 + _size;
+	}
+	
+	private int _x, _z, _size = 0;
 	private short _y;
 	private ubyte _sizeX, _sizeY, _sizeZ;
 	private byte[] _data;
 	
-	mixin(_getter!("x"));
-	mixin(_getter!("y"));
-	mixin(_getter!("z"));
-	mixin(_getter!("sizeX"));
-	mixin(_getter!("sizeY"));
-	mixin(_getter!("sizeZ"));
-	mixin(_getter!("data", "size"));
+	mixin(_getter!("x", "y", "z", "sizeX", "sizeY", "sizeZ", "data", "size"));
 	
 	public this()
 	{
@@ -1485,29 +1884,31 @@ class MapChunk : Receivable
 		
 		scope stream = new Array(compressed);
 		
-		//Stdout.formatln("mapchunk {}/{}/{} {} * {} * {} compressed: {}", x, y, z, _sizeX, _sizeY, _sizeZ, _size);
+		Stdout.formatln("mapchunk {}/{}/{} {} * {} * {} compressed: {}", x, y, z, _sizeX, _sizeY, _sizeZ, _size);
 				
 		_data = new byte[cast(uint)((_sizeX) * (_sizeY) * (_sizeZ) * 2.5)];
 		scope zip = new ZlibInput(stream);
+		zip.read(_data);
 		
-		return minSize + _size;
+		return minSize;
 	}
 }
 
 class MultiBlockChange : Receivable
 {
 	mixin(_packetID!("MultiBlockChange"));
-	mixin(_minSize!(11));
+	
+	public size_t minSize()
+	{
+		return 10 + (4 * _length);
+	}
 	
 	private int _x, _z;
-	private short _length;
+	private short _length = 0;
 	private short[] _coordinates;
 	private byte[] _types, _metadata;
 	
-	mixin(_getter!("length"));
-	mixin(_getter!("coordinates"));
-	mixin(_getter!("types"));
-	mixin(_getter!("metadata"));
+	mixin(_getter!("length", "coordinates", "types", "metadata"));
 	
 	public this()
 	{
@@ -1528,23 +1929,19 @@ class MultiBlockChange : Receivable
 		input.read(_types);
 		input.read(_metadata);
 		
-		return minSize + (4 * _length); 
+		return minSize; 
 	}
 }
 
 class BlockChange : Receivable
 {
 	mixin(_packetID!("BlockChange"));
-	mixin(_minSize!(12));
+	mixin(_minSize!(11));
 	
 	private int _x, _z;
 	private byte _y, _type, _metadata;
 	
-	mixin(_getter!("x"));
-	mixin(_getter!("y"));
-	mixin(_getter!("z"));
-	mixin(_getter!("type"));
-	mixin(_getter!("metadata"));
+	mixin(_getter!("x", "y", "z", "type", "metadata"));
 	
 	public this()
 	{
@@ -1563,20 +1960,16 @@ class BlockChange : Receivable
 	}
 }
 
-class PlayNoteBlock : Receivable
+class BlockAction : Receivable
 {
-	mixin(_packetID!("PlayNoteBlock"));
-	mixin(_minSize!(13));
+	mixin(_packetID!("BlockAction"));
+	mixin(_minSize!(12));
 	
 	private int _x, _z;
 	private short _y;
-	private byte _type, _pitch;
+	private byte _arg1, _arg2;
 	
-	mixin(_getter!("x"));
-	mixin(_getter!("y"));
-	mixin(_getter!("z"));
-	mixin(_getter!("type"));
-	mixin(_getter!("pitch"));
+	mixin(_getter!("x", "y", "z", "arg1", "arg2"));
 	
 	public this()
 	{
@@ -1588,8 +1981,8 @@ class PlayNoteBlock : Receivable
 		|_x
 		|_y
 		|_z
-		|_type
-		|_pitch;
+		|_arg1
+		|_arg2;
 		
 		return minSize;
 	}
@@ -1602,20 +1995,18 @@ struct Record
 class Explosion : Receivable
 {
 	mixin(_packetID!("Explosion"));
-	mixin(_minSize!(33));
 	
-
-		
+	public size_t minSize()
+	{
+		return 32 + (3 * _recordCount);
+	}
+	
 	private double _x, _y, _z;
 	private float _unknown;
-	private int _recordCount;
+	private int _recordCount = 0;
 	private Record[] _records;
 	
-	mixin(_getter!("x"));
-	mixin(_getter!("y"));
-	mixin(_getter!("z"));
-	mixin(_getter!("recordCount"));
-	mixin(_getter!("records"));
+	mixin(_getter!("x", "y", "z", "recordCount", "records"));
 	
 	public this()
 	{
@@ -1640,22 +2031,92 @@ class Explosion : Receivable
 			_records[i] = r;
 		}
 		
-		return minSize + 3 * _recordCount;
+		return minSize;
+	}
+}
+
+class SoundEffect : Receivable
+{
+	mixin(_packetID!("SoundEffect"));
+	mixin(_minSize!(17));
+	
+	private int _id, _x, _z, _data;
+	private byte _y;
+	
+	mixin(_getter!("id", "x", "y", "z", "data"));
+	
+	public int receive(MinecraftDataInput input)
+	{
+		input
+		|_id
+		|_x
+		|_y
+		|_z
+		|_data;
+		
+		return minSize;
+	}
+}
+
+class NewState : Receivable
+{
+	mixin(_packetID!("NewState"));
+	mixin(_minSize!(1));
+	
+	private byte _reason, _mode;
+	
+	mixin(_getter!("reason", "mode"));
+	
+	public int receive(MinecraftDataInput input)
+	{
+		input
+		|_reason
+		|_mode;
+		
+		return minSize;
+	}
+}
+
+class Thunderbolt : Receivable
+{
+	mixin(_packetID!("Thunderbolt"));
+	mixin(_minSize!(17));
+	
+	private int _EID, _x, _y, _z;
+	private bool _unknown;
+	
+	mixin(_getter!("EID", "x", "y", "z"));
+	
+	public this()
+	{
+	}
+	
+	public int receive(MinecraftDataInput input)
+	{
+		input
+		|_EID
+		|_unknown
+		|_x
+		|_y
+		|_z;
+		
+		return minSize;
 	}
 }
 
 class OpenWindow : Receivable
 {
 	mixin(_packetID!("OpenWindow"));
-	mixin(_minSize!(6));
+	
+	public size_t minSize()
+	{
+		return 5 + 2 * _title.length;
+	}
 	
 	private byte _id, _type, _slots;
 	private char[] _title;
 	
-	mixin(_getter!("id"));
-	mixin(_getter!("type"));
-	mixin(_getter!("slots"));
-	mixin(_getter!("title"));
+	mixin(_getter!("id", "type", "slots", "title"));
 	
 	public this()
 	{
@@ -1669,14 +2130,14 @@ class OpenWindow : Receivable
 		|_title
 		|_slots;
 		
-		return minSize + _title.length;
+		return minSize;
 	}
 }
 
 class CloseWindow : Sendable, Receivable
 {
 	mixin(_packetID!("CloseWindow"));
-	mixin(_minSize!(2));
+	mixin(_minSize!(1));
 	
 	private byte _id;
 	
@@ -1709,7 +2170,6 @@ class CloseWindow : Sendable, Receivable
 class WindowClick : Sendable
 {
 	mixin(_packetID!("WindowClick"));
-	mixin(_minSize!(9));
 	
 	private byte _id, _rightClick, _count;
 	private short _slot, _transactionID, _itemID, _uses;
@@ -1746,16 +2206,12 @@ class WindowClick : Sendable
 class SetSlot : Receivable
 {
 	mixin(_packetID!("SetSlot"));
-	mixin(_minSize!(6));
+	mixin(_minSize!(5));
 	
 	private byte _id, _count;
 	private short _slot, _itemID, _uses;
 	
-	mixin(_getter!("id"));
-	mixin(_getter!("count"));
-	mixin(_getter!("slot"));
-	mixin(_getter!("itemID"));
-	mixin(_getter!("uses"));
+	mixin(_getter!("id", "count", "slot", "itemID", "uses"));
 	
 	public this()
 	{
@@ -1773,6 +2229,8 @@ class SetSlot : Receivable
 			input
 			|_count
 			|_uses;
+			
+			return minSize + 3; //byte + short
 		}
 		
 		return minSize;
@@ -1789,15 +2247,19 @@ struct Item
 class WindowItems : Receivable
 {
 	mixin(_packetID!("WindowItems"));
-	mixin(_minSize!(4));
+	
+	public size_t minSize()
+	{
+		return 3 + (2 * _count);
+	}
 		
 	private byte _id;
-	private short _count;
+	private short _count = 0;
 	private Item[] _items;
+	
+	private int _size;
 
-	mixin(_getter!("id"));
-	mixin(_getter!("count"));
-	mixin(_getter!("items"));
+	mixin(_getter!("id", "count", "items"));
 	
 	public this()
 	{
@@ -1805,6 +2267,8 @@ class WindowItems : Receivable
 	
 	public int receive(MinecraftDataInput input)
 	{
+		_size = 0;
+		
 		input
 		|_id
 		|_count;
@@ -1819,18 +2283,23 @@ class WindowItems : Receivable
 			if(i.id != -1)
 			{
 				input|i.count|i.uses;
+				_size += 3;
+			}
+			else
+			{
+				_size += 1;
 			}
 			_items[n] = i;
 		}
 		
-		return minSize;
+		return 3 + _size;
 	}
 }
 
 class UpdateProgress : Receivable
 {
 	mixin(_packetID!("UpdateProgress"));
-	mixin(_minSize!(6));
+	mixin(_minSize!(5));
 	
 	private byte _id;
 	private short _bar;
@@ -1858,15 +2327,13 @@ class UpdateProgress : Receivable
 class Transaction : Receivable
 {
 	mixin(_packetID!("Transaction"));
-	mixin(_minSize!(5));
+	mixin(_minSize!(4));
 	
 	private byte _id;
 	private short _transactionID;
 	private bool _accepted;
 	
-	mixin(_getter!("id"));
-	mixin(_getter!("transactionID"));
-	mixin(_getter!("accepted"));
+	mixin(_getter!("id", "transactionID", "accepted"));
 	
 	public this()
 	{
@@ -1883,22 +2350,37 @@ class Transaction : Receivable
 	}
 }
 
+class CreativeInventoryAction : Receivable
+{
+	mixin(_packetID!("CreativeInventoryAction"));
+	mixin(_minSize!(8));
+	
+	private short _slot, _id, _count, _uses;
+	
+	mixin(_getter!("slot", "id", "count", "uses"));
+	
+	public int receive(MinecraftDataInput input)
+	{
+		input
+		|_slot
+		|_id
+		|_count
+		|_uses;
+		
+		return minSize;
+	}
+}
+
 class UpdateSign : Receivable
 {
 	mixin(_packetID!("UpdateSign"));
-	mixin(_minSize!(19));
+	mixin(_minSize!(18));
 	
 	private int _x, _z;
 	private short _y;
 	private char[] _line1, _line2, _line3, _line4;
 	
-	mixin(_getter!("x"));
-	mixin(_getter!("y"));
-	mixin(_getter!("z"));
-	mixin(_getter!("line1"));
-	mixin(_getter!("line2"));
-	mixin(_getter!("line3"));
-	mixin(_getter!("line4"));
+	mixin(_getter!("x", "y", "z", "line1", "line2", "line3", "line4"));
 	
 	public this()
 	{
@@ -1915,14 +2397,100 @@ class UpdateSign : Receivable
 		|_line3
 		|_line4;
 		
-		return minSize + line1.length + line2.length + line3.length + line4.length;
+		return minSize + 2 * (_line1.length + _line2.length + _line3.length + _line4.length);
+	}
+}
+
+class ItemData : Receivable
+{
+	mixin(_packetID!("ItemData"));
+	
+	public size_t minSize()
+	{
+		return 5 + _len;
+	}
+	
+	private short _type, _id;
+	private ubyte _len = 0;
+	private byte[] _data;
+	
+	mixin(_getter!("type", "id", "len", "data"));
+	
+	public int receive(MinecraftDataInput input)
+	{
+		input
+		|_type
+		|_id
+		|_len;
+		
+		_data = new byte[_len];
+		
+		input.read(data);
+		
+		return minSize;
+	}
+}
+
+class IncrementStatistic : Receivable
+{
+	mixin(_packetID!("IncrementStatistic"));
+	mixin(_minSize!(5));
+	
+	private int _id;
+	private byte _amount;
+	
+	mixin(_getter!("id", "amount"));
+	
+	public int receive(MinecraftDataInput input)
+	{
+		input
+		|_id
+		|_amount;
+		
+		return minSize;
+	}
+}
+
+class PlayerListItem : Receivable
+{
+	mixin(_packetID!("PlayerListItem"));
+	mixin(_minSize!(5));
+	
+	private char[] _name;
+	private bool _online;
+	private short _ping;
+	
+	mixin(_getter!("name", "online", "ping"));
+	
+	public int receive(MinecraftDataInput input)
+	{
+		input
+		|_name
+		|_online
+		|_ping;
+		
+		return minSize + 2 * _name.length;
+	}
+}
+
+class ServerListPing : Sendable
+{
+	mixin(_packetID!("ServerListPing"));
+	
+	this()
+	{
+	}
+	
+	public void send(MinecraftDataOutput output)
+	{
+		//nothing to send
 	}
 }
 
 class Disconnect : Sendable, Receivable
 {
 	mixin(_packetID!("Disconnect"));
-	mixin(_minSize!(3));
+	mixin(_minSize!(2));
 	
 	private char[] _reason;
 	
@@ -1948,6 +2516,6 @@ class Disconnect : Sendable, Receivable
 		input
 		|_reason;
 		
-		return minSize + _reason.length;
+		return minSize + 2 * _reason.length;
 	}
 }

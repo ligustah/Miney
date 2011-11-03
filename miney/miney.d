@@ -2,11 +2,12 @@ module miney.miney;
 
 version(build)
 {
-	pragma(link, DD-minid, tango);
+	pragma(link, DD-croc, tango);
 }
 
-import minid.api;
-import minid.bind;
+import croc.api;
+import croc.api_debug;
+import croc.ex_bind;
 
 import tango.net.device.Socket;
 import tango.io.device.Array;
@@ -21,9 +22,10 @@ import tango.time.Clock;
 
 import tango.math.Math;
 
+import tango.util.container.LinkedList;
+
 import Integer = tango.text.convert.Integer;
 
-import tango.core.Thread;
 import tango.core.Array;
 import tango.core.Memory;
 import tango.core.Exception;
@@ -33,14 +35,13 @@ import miney.protocol;
 import miney.timer;
 import miney.network;
 import miney.util;
-import bindings.all;
+
+import bindings = bindings.all;
 
 debug import tango.core.tools.TraceExceptions;
 
 class Miney : ISelectable
 {
-	private char[]					_host;
-	private ushort					_port;
 	private Socket					_socket;
 	private Bin						_inBuffer;
 	private Bout					_outBuffer;
@@ -54,36 +55,32 @@ class Miney : ISelectable
 	private Time					_lastUpdate;
 	private bool					_connected = false;
 	private ulong					_timerID;
-	private MDAction[ulong]			_timerData;
-	private ulong[ulong]			_timerRefs;	
-	private int chunks = 0;
+	private CrocAction[ulong]		_timerData;
+	private ulong[ulong]			_timerRefs;
 	private long					_download;
 	private long					_upload;
+	private LinkedList!(Receivable)	_lastPackets;
 	
-	private MDVM*					_vm;
-	private MDThread*				_mainThread;
+	private CrocVM					_vm;
+	private CrocThread*				_mainThread;
 	private ulong					_update;
-	private MDAction*				_test;
-	private ulong					_timerTest;
-	
 	
 	this()
 	{
 		assert(false, "no no no");
 	}
 	
-	this(char[] host, ushort port, Network n, MDVM* vm)
+	this(Network n)
 	{
-		this._host = host;
-		this._port = port;
+		this._lastPackets = new LinkedList!(Receivable)();
 		this._network = n;
 		this._socket = new Socket();
 		this._inBuffer = new Bin(_socket, 1024 * 10);
 		this._outBuffer = new Bout(_socket, 1024 * 4);
 		this._input = new MinecraftDataInput(_inBuffer);
 		this._output = new MinecraftDataOutput(_outBuffer);
-		this._vm = vm;
-		this._mainThread = mainThread(vm);
+		
+		this._mainThread = openVM(&_vm);
 		
 		_socket.native.blocking = false;
 		n.addBot(this);
@@ -93,9 +90,9 @@ class Miney : ISelectable
 	
 	bool miney_timer(void* data)
 	{		
-		MDAction mda = cast(MDAction)data;
+		CrocAction mda = cast(CrocAction)data;
 		
-		auto slot = pushRef(_mainThread, mda.mdRef);
+		auto slot = pushRef(_mainThread, mda.crocRef);
 		pushNull(_mainThread);
 		
 		try
@@ -104,21 +101,21 @@ class Miney : ISelectable
 			bool ret = isTrue(_mainThread, -1);
 			pop(_mainThread);
 			return ret;
-		}catch(MDException mde)
+		}catch(CrocException mde)
 		{
 			catchException(_mainThread);
-			pop(_mainThread);
+			methodCall(_mainThread, -1, "tracebackString", 0);
 			
 			Stdout.formatln("error calling timer callback: {}", mde);
-			Stdout.formatln(getString(_mainThread, getTraceback(_mainThread))).flush;
-			pop(_mainThread);
+			Stdout.formatln(getString(_mainThread, -1)).flush;
+			pop(_mainThread, 2);
 			return true;
 		}
 		
 		return false;
 	}
 	
-	static uint miney_send(MDThread* t)
+	static uint miney_send(CrocThread* t)
 	{
 		Miney m = superGet!(Miney)(t, getUpval(t, 0));
 		auto numParams = stackSize(t) - 1;
@@ -128,14 +125,13 @@ class Miney : ISelectable
 			Sendable s = superGet!(Sendable)(t, i);
 			if(s is null)
 				continue;
-			//Stdout.formatln("sending {}", s.classinfo.base.name);
 			m.queue(s);
 		}
 		
 		return 0;
 	}
 	
-	static uint miney_raw(MDThread* t)
+	static uint miney_raw(CrocThread* t)
 	{
 		Sendable s = superGet!(Sendable)(t, 1);
 		Array a = new Array(64, 64);
@@ -148,20 +144,21 @@ class Miney : ISelectable
 		return 1;
 	}
 	
-	static uint miney_metadata(MDThread* t)
+	static uint miney_metadata(CrocThread* t)
 	{
 		MetadataPacket mp = superGet!(MetadataPacket)(t, 1);
 			
-		Variant[] variants = mp.metadata;
+		Metadata[] meta = mp.metadata;
 		
-		if(!variants.length)
+		if(!meta.length)
 		{
 			newArray(t, 0);
 			return 1;
 		}
 		
-		foreach(v; variants)
+		foreach(m; meta)
 		{
+			Variant v = m.value;
 			if(v.isImplicitly!(int))
 				pushInt(t, v.get!(int));
 			else if(v.isA!(float))
@@ -182,12 +179,12 @@ class Miney : ISelectable
 			else
 				assert(0, "invalid metadata");
 		}
-		newArrayFromStack(t, variants.length);
+		newArrayFromStack(t, meta.length);
 		
 		return 1;
 	}
 	
-	static uint miney_connect(MDThread* t)
+	static uint miney_connect(CrocThread* t)
 	{
 		Miney m = superGet!(Miney)(t, getUpval(t, 0));
 		auto numParams = stackSize(t) - 2;
@@ -199,10 +196,13 @@ class Miney : ISelectable
 		
 		m._socket.connect(host, port);
 		
+		//pretend we want to write to see when the connection is established
+		m._network.registerBot(m, Event.Read | Event.Write);
+		
 		return 0;
 	}
 	
-	static uint miney_distance(MDThread* t)
+	static uint miney_distance(CrocThread* t)
 	{
 		double x1, y1, z1, x2, y2, z2;
 		
@@ -225,7 +225,7 @@ class Miney : ISelectable
 		return 1;
 	}
 	
-	static uint miney_setTimer(MDThread* t)
+	static uint miney_setTimer(CrocThread* t)
 	{
 		Miney m = superGet!(Miney)(t, getUpval(t, 0));
 		auto numParams = stackSize(t) - 2;
@@ -237,7 +237,7 @@ class Miney : ISelectable
 		
 		pushInt(t, m._timerID);
 		
-		auto mda = new MDAction(r);
+		auto mda = new CrocAction(r);
 		
 		mda.action = Action(TimeSpan.fromMillis(l), &m.miney_timer, cast(void*)mda, true);
 		
@@ -247,7 +247,7 @@ class Miney : ISelectable
 		return 1;
 	}
 	
-	static uint miney_stopTimer(MDThread* t)
+	static uint miney_stopTimer(CrocThread* t)
 	{
 		Miney m = superGet!(Miney)(t, getUpval(t, 0));
 		auto numParams = stackSize(t) - 2;
@@ -264,11 +264,11 @@ class Miney : ISelectable
 			
 			m._network.removeAction(mda.action);
 			m._timerData.remove(r);
-			removeRef(t, mda.mdRef);
+			removeRef(t, mda.crocRef);
 		}
 		else
 		{
-			throwException(t, "invalid timer id {}", r);
+			throwStdException(t, "ApiError", "invalid timer id {}", r);
 		}
 		
 		return 0;
@@ -276,7 +276,35 @@ class Miney : ISelectable
 	
 	private void initAPI()
 	{
-		MDThread* t = _mainThread;
+		Stdout("init API").newline;
+		CrocThread* t = _mainThread;
+		
+		loadStdlibs(t, CrocStdlib.All);
+		bindings.init(t);
+		
+		WrapGlobals!(
+			WrapType!(
+				Miney,
+				"_miney_",
+				WrapMethod!(Miney.queue)
+			)
+		)(t);
+		
+		foreach(k; PacketHandlers.values)
+		{
+			char[] name = k.name;
+			pushString(t, name[name.rfind('.')+1..$]);
+		}
+		newArrayFromStack(t, PacketHandlers.length);
+		newGlobal(t, "receivables");
+		
+		pushGlobal(t, "modules");
+		field(t, -1, "path");
+		pushChar(t, ';');
+		pushString(t, "scripts");
+		cateq(t, -3, 2);
+		fielda(t, -2, "path");
+		pop(t);
 		
 		superPush!(Miney)(t, this);
 		newFunction(t, &miney_send, "send", 1);
@@ -302,17 +330,22 @@ class Miney : ISelectable
 		
 		newFunction(t, &miney_metadata, "metadata", 0);
 		newGlobal(t, "metadata");
-		
-		lookup(_mainThread, "miney.update");
-		_update = createRef(_mainThread, -1);
-		pop(_mainThread);
+		Stdout("end init API").newline;
 	}
 	
 	private void init()
 	{
+		Stdout("init").newline;
+		importModuleNoNS(_mainThread, "miney");
+		
+		lookup(_mainThread, "miney.update");
+		_update = createRef(_mainThread, -1);
+		pop(_mainThread);
+		
 		auto slot = lookupCT!("miney.onInit")(_mainThread);
 		pushNull(_mainThread);
 		rawCall(_mainThread, slot, 0);
+		Stdout("end init").newline;
 	}
 	
 	Handle fileHandle()
@@ -365,7 +398,7 @@ class Miney : ISelectable
 	
 	public void queue(Sendable s)
 	{
-		//Stdout("queuing packet").newline;
+		//Stdout.formatln("sending {:X#}", s.packetID);
 		try
 		{
 			_output | s;
@@ -382,7 +415,17 @@ class Miney : ISelectable
 			ubyte id = _input.getByte();			
 			auto info = getHandler(id);
 			
-			assert(!(info is null), "Unknown packet: " ~ Integer.toString(id, "x#"));
+			if(info is null)
+			{
+				Stdout.formatln("Unknown packet: {:X#}", id);
+				Stdout("Last 10 packets:").newline;
+				
+				foreach(p; _lastPackets)
+				{
+					Stdout.formatln("{:X#} {}", p.packetID, packetID2Name(p.packetID));
+				}
+				assert(false);
+			}
 			
 			_packet = cast(Receivable)info.create();
 		}
@@ -402,6 +445,7 @@ class Miney : ISelectable
 		
 		_download += _inBuffer.position;
 		handlePacket(_packet);
+		storePacket(_packet);
 		_packet = null;
 		_inBuffer.compress;
 		
@@ -411,12 +455,13 @@ class Miney : ISelectable
 	private void connected()
 	{
 		scope(exit) _connected = true;
+		_lastKeepAlive = Clock.now();
 		int slot;
 		
 		try
 		{
 			slot = lookupCT!("miney.onConnect")(_mainThread);
-		}catch(MDException mde)
+		}catch(CrocException mde)
 		{
 			//no onConnect available
 			Stdout("No onConnect handler").newline;
@@ -424,14 +469,14 @@ class Miney : ISelectable
 		}
 		
 		pushNull(_mainThread);
-		pushString(_mainThread, _host);
-		pushInt(_mainThread, _port);
 		
 		try
 		{
 			rawCall(_mainThread, slot, 0);
-		}catch(MDException mde)
+		}catch(CrocException mde)
 		{
+			//pop(_mainThread);
+			catchException(_mainThread);
 			pop(_mainThread);
 			Stdout.formatln("Error calling onConnect: {}", mde);
 		}
@@ -445,7 +490,7 @@ class Miney : ISelectable
 		try
 		{
 			slot = lookupCT!("miney.onDisconnect")(_mainThread);
-		}catch(MDException mde)
+		}catch(CrocException mde)
 		{
 			//no onDisconnect available
 			Stdout("No onDisconnect handler").newline;
@@ -457,7 +502,7 @@ class Miney : ISelectable
 		try
 		{
 			rawCall(_mainThread, slot, 0);
-		}catch(MDException mde)
+		}catch(CrocException mde)
 		{
 			pop(_mainThread);
 			Stdout.formatln("Error calling onDisconnect: {}", mde);
@@ -483,14 +528,15 @@ class Miney : ISelectable
 		Time now = Clock.now;
 		
 		//add other update routines here
-		if(now - _lastKeepAlive >= TimeSpan.fromSeconds(30))
+		if(_connected && now - _lastKeepAlive >= TimeSpan.fromSeconds(30))
 		{
 			queue(new KeepAlive());
 			_lastKeepAlive = now;
 			gc(_mainThread);
 			GC.collect();
 			//GC.minimize();
-			//Stdout.formatln("bytes allocated: {} stack size: {}", bytesAllocated(_vm), stackSize(_mainThread));
+			//Stdout.formatln("bytes allocated: {} stack size: {}", bytesAllocated(&_vm), stackSize(_mainThread));
+			//printStack(_mainThread);
 		}
 		
 		if(now - _lastUpdate >= TimeSpan.fromMillis(50))
@@ -507,45 +553,26 @@ class Miney : ISelectable
 
 		updateWrite();
 	}
+	
+	private void storePacket(Receivable r)
+	{
+		_lastPackets.append(r);
+		
+		if(_lastPackets.size > 10)
+		{
+			_lastPackets.removeHead();
+		}
+	}
 }
 
 void main()
 {
-	MDVM vm;
+	CrocVM vm;
 	
 	auto t = openVM(&vm);
-	
-	loadStdlibs(t, MDStdlib.All);
-	initMineyVM(&vm);
-	WrapGlobals!(
-		WrapType!(
-			Miney,
-			"_miney_",
-			WrapMethod!(Miney.queue)
-		)
-	)(t);
-	
-	foreach(k; PacketHandlers.values)
-	{
-		char[] name = k.name;
-		pushString(t, name[name.rfind('.')+1..$]);
-	}
-	newArrayFromStack(t, PacketHandlers.length);
-	newGlobal(t, "receivables");
-	
-	char[] path = getString(t, lookupCT!("modules.path")(t));
-	pop(t);
-	path ~= ";scripts";
-	
-	pushGlobal(t, "modules");
-	pushString(t, path);
-	fielda(t, -2, "path");
-	pop(t);
-	
-	importModuleNoNS(t, "miney");
-	
+		
 	Network n = new Network();
-	Miney m = new Miney("localhost", 25565, n, &vm);
+	Miney m = new Miney(n);
 	
 	n.run();
 }
