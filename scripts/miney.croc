@@ -39,8 +39,6 @@ local function randomString(len : int = 10, colored : bool = false)
 //username = "blaa"
 
 global time_connected = 0
-global total_download = 0
-global total_upload = 0
 
 global namespace spawn
 {
@@ -161,8 +159,12 @@ global function onPacket(packet)
 	}
 }
 
+global total_download = 0
+global total_upload = 0
+
 global function update(download, upload)
 {
+	//writefln $ "{} {} {} {}", total_download, download, total_upload, upload
 	total_download += download
 	total_upload += upload
 }
@@ -180,6 +182,6 @@ onKeepAlive(send)  //simply return that keepalive back to the server
 
 onMapDownloadFinished(\{
 	send $ Chat $ "Map download finished"
-	send $ Chat $ format $ "My position is {}/{}/{}", toInt(position.x), toInt(position.y), toInt(position.z)
+	send $ Chat $ format $ "My position is {}/{}/{}", position.block()
 	send $ Chat $ format $ "I am standing on {}", (ItemType.toString $ map.blockAt(toInt(position.x), toInt(position.y) - 1, toInt(position.z)))
 })

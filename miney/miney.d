@@ -88,7 +88,10 @@ class Miney : ISelectable
 		init();
 	}
 	
-	bool miney_timer(void* data)
+	/**
+		callback function which is internally used by the timer functions
+	*/
+	private bool miney_timer(void* data)
 	{		
 		CrocAction mda = cast(CrocAction)data;
 		
@@ -115,6 +118,11 @@ class Miney : ISelectable
 		return false;
 	}
 	
+	/**
+		Queue one or more packets to be sent to the server we are connected to at the moment.
+		
+		FIXME: Should probably throw an error if there is no open connection.
+	*/
 	static uint miney_send(CrocThread* t)
 	{
 		Miney m = superGet!(Miney)(t, getUpval(t, 0));
@@ -131,6 +139,10 @@ class Miney : ISelectable
 		return 0;
 	}
 	
+	/**
+		This is a somewhat hacky function that will write a packet into a string.
+		(I used this to test a packet injection vulnerability in Mineserver)
+	*/
 	static uint miney_raw(CrocThread* t)
 	{
 		Sendable s = superGet!(Sendable)(t, 1);
@@ -144,6 +156,12 @@ class Miney : ISelectable
 		return 1;
 	}
 	
+	/**
+		retrieve metadata from a metadata packet (e.g. MobSpawn).
+		This will return an array.
+		
+		FIXME: Shouldn't this be a table?!
+	*/
 	static uint miney_metadata(CrocThread* t)
 	{
 		MetadataPacket mp = superGet!(MetadataPacket)(t, 1);
@@ -184,6 +202,11 @@ class Miney : ISelectable
 		return 1;
 	}
 	
+	/**
+		Extract data from a MapChunk packet. Use this function instead
+		of the .data property, because that one will return a "byte" array
+		and croc only knows longs.
+	*/
 	static uint miney_data(CrocThread* t)
 	{
 		MapChunk m = superGet!(MapChunk)(t, 1);
@@ -193,12 +216,14 @@ class Miney : ISelectable
 		return 1;
 	}
 	
+	/**
+		connect to the specified host:port
+		FIXME: should probably throw an error if there is a connection already
+	*/
 	static uint miney_connect(CrocThread* t)
 	{
 		Miney m = superGet!(Miney)(t, getUpval(t, 0));
 		auto numParams = stackSize(t) - 2;
-		
-		assert(numParams == 2);
 		
 		char[] host = checkStringParam(t, 1);
 		uint port = checkIntParam(t, 2);
@@ -211,6 +236,10 @@ class Miney : ISelectable
 		return 0;
 	}
 	
+	/**
+		Returns the distance between two objects. Both are expected to
+		contain the fields x, y and z.
+	*/
 	static uint miney_distance(CrocThread* t)
 	{
 		double x1, y1, z1, x2, y2, z2;
@@ -234,6 +263,9 @@ class Miney : ISelectable
 		return 1;
 	}
 	
+	/**
+		adds a timer and returns its ID
+	*/
 	static uint miney_setTimer(CrocThread* t)
 	{
 		Miney m = superGet!(Miney)(t, getUpval(t, 0));
@@ -250,12 +282,15 @@ class Miney : ISelectable
 		
 		mda.action = Action(TimeSpan.fromMillis(l), &m.miney_timer, cast(void*)mda, true);
 		
-		m._timerData[m._timerID++] = mda;
+		m._timerData[m._timerID++] = mda;		//store our action and increment the ID counter
 		m._network.addAction(mda.action);
 		
 		return 1;
 	}
 	
+	/**
+		stops a timer given the ID
+	*/
 	static uint miney_stopTimer(CrocThread* t)
 	{
 		Miney m = superGet!(Miney)(t, getUpval(t, 0));
@@ -291,6 +326,7 @@ class Miney : ISelectable
 		loadStdlibs(t, CrocStdlib.All);
 		bindings.init(t);
 		
+		//TODO: find out why I am doing this?
 		WrapGlobals!(
 			WrapType!(
 				Miney,
@@ -299,6 +335,8 @@ class Miney : ISelectable
 			)
 		)(t);
 		
+		//add an array containing the names of all receivables.
+		//used by signal.croc
 		foreach(k; PacketHandlers.values)
 		{
 			char[] name = k.name;
@@ -351,10 +389,12 @@ class Miney : ISelectable
 		Stdout("init").newline;
 		importModuleNoNS(_mainThread, "miney");
 		
+		//store the update function for later use
 		lookup(_mainThread, "miney.update");
 		_update = createRef(_mainThread, -1);
 		pop(_mainThread);
 		
+		//tell Miney that we are ready to start
 		auto slot = lookupCT!("miney.onInit")(_mainThread);
 		pushNull(_mainThread);
 		rawCall(_mainThread, slot, 0);
@@ -540,21 +580,22 @@ class Miney : ISelectable
 	{
 		Time now = Clock.now;
 		
-		//add other update routines here
+		//TODO add other update routines here?
 		if(_connected && now - _lastKeepAlive >= TimeSpan.fromSeconds(30))
 		{
-			queue(new KeepAlive());
+			queue(new KeepAlive());	//should this be moved to script code?
 			_lastKeepAlive = now;
 			Stdout("running GC").newline;
 			
 			gc(_mainThread);
 			GC.collect();
 			GC.minimize();
-			//Stdout.formatln("bytes allocated: {} stack size: {}", bytesAllocated(&_vm), stackSize(_mainThread));
+			Stdout.formatln("bytes allocated: {} stack size: {}", bytesAllocated(&_vm), stackSize(_mainThread));
 			//printStack(_mainThread);
 		}
 		
-		if(now - _lastUpdate >= TimeSpan.fromMillis(50))
+		//TODO i don't think this needs to be called this often, since i added timers
+		if(now - _lastUpdate >= TimeSpan.fromMillis(200))
 		{
 			auto slot = pushRef(_mainThread, _update);
 			pushNull(_mainThread);
@@ -569,6 +610,10 @@ class Miney : ISelectable
 		updateWrite();
 	}
 	
+	/**
+		stores the last 10 packets for debugging purposes
+		@see parse()
+	*/
 	private void storePacket(Receivable r)
 	{
 		_lastPackets.append(r);
