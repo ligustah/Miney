@@ -139,9 +139,6 @@ global function onPacket(packet)
 		case PacketID.Login:
 			writefln $ "mapSeed: {}", packet.mapSeed
 			break
-		case PacketID.Chat:
-			//writefln $ "Chat: {}", packet.message
-			break
 		case PacketID.TimeUpdate:
 			time = packet.time % 24000
 			break;
@@ -177,10 +174,12 @@ onTimeUpdate(\p{
 	}
 })
 
-onChat(\p->	writeln $ p.message)
+onChat(\p->writeln $ p.message)
 
 onKeepAlive(send)  //simply return that keepalive back to the server
 
 onMapDownloadFinished(\{
 	send $ Chat $ "Map download finished"
+	send $ Chat $ format $ "My position is {}/{}/{}", toInt(position.x), toInt(position.y), toInt(position.z)
+	send $ Chat $ format $ "I am standing on {}", (ItemType.toString $ map.blockAt(toInt(position.x), toInt(position.y) - 1, toInt(position.z)))
 })

@@ -184,6 +184,15 @@ class Miney : ISelectable
 		return 1;
 	}
 	
+	static uint miney_data(CrocThread* t)
+	{
+		MapChunk m = superGet!(MapChunk)(t, 1);
+		
+		memblockFromDArray(t, m.data);
+		
+		return 1;
+	}
+	
 	static uint miney_connect(CrocThread* t)
 	{
 		Miney m = superGet!(Miney)(t, getUpval(t, 0));
@@ -330,6 +339,10 @@ class Miney : ISelectable
 		
 		newFunction(t, &miney_metadata, "metadata", 0);
 		newGlobal(t, "metadata");
+		
+		newFunction(t, &miney_data, "data", 0);
+		newGlobal(t, "data");
+		
 		Stdout("end init API").newline;
 	}
 	
@@ -532,9 +545,11 @@ class Miney : ISelectable
 		{
 			queue(new KeepAlive());
 			_lastKeepAlive = now;
+			Stdout("running GC").newline;
+			
 			gc(_mainThread);
 			GC.collect();
-			//GC.minimize();
+			GC.minimize();
 			//Stdout.formatln("bytes allocated: {} stack size: {}", bytesAllocated(&_vm), stackSize(_mainThread));
 			//printStack(_mainThread);
 		}

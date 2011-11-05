@@ -33,6 +33,7 @@ void init(CrocThread* t)
 	InventoryTypeEnum.init(t);
 	EntityTypeEnum.init(t);
 	EntActionEnum.init(t);
+	ItemTypeEnum.init(t);
 	KeepAliveObj.init(t);
 	LoginObj.init(t);
 	HandshakeObj.init(t);
@@ -349,6 +350,278 @@ struct EntActionEnum
 		pushInt(t, EntAction.StopSprinting); fielda(t, -2, "StopSprinting");
 		
 		newGlobal(t, "EntAction");
+	}
+}
+
+struct ItemTypeEnum
+{
+	static:
+	void init(CrocThread* t)
+	{
+		newNamespace(t, "ItemType");
+		
+		pushInt(t, ItemType.Air); fielda(t, -2, "Air");
+		pushInt(t, ItemType.Stone); fielda(t, -2, "Stone");
+		pushInt(t, ItemType.Grass); fielda(t, -2, "Grass");
+		pushInt(t, ItemType.Dirt); fielda(t, -2, "Dirt");
+		pushInt(t, ItemType.Cobblestone); fielda(t, -2, "Cobblestone");
+		pushInt(t, ItemType.WoodenPlank); fielda(t, -2, "WoodenPlank");
+		pushInt(t, ItemType.Sapling); fielda(t, -2, "Sapling");
+		pushInt(t, ItemType.Bedrock); fielda(t, -2, "Bedrock");
+		pushInt(t, ItemType.Water); fielda(t, -2, "Water");
+		pushInt(t, ItemType.StationaryWater); fielda(t, -2, "StationaryWater");
+		pushInt(t, ItemType.Lava); fielda(t, -2, "Lava");
+		pushInt(t, ItemType.StationaryLava); fielda(t, -2, "StationaryLava");
+		pushInt(t, ItemType.Sand); fielda(t, -2, "Sand");
+		pushInt(t, ItemType.Gravel); fielda(t, -2, "Gravel");
+		pushInt(t, ItemType.GoldOre); fielda(t, -2, "GoldOre");
+		pushInt(t, ItemType.IronOre); fielda(t, -2, "IronOre");
+		pushInt(t, ItemType.CoalOre); fielda(t, -2, "CoalOre");
+		pushInt(t, ItemType.Wood); fielda(t, -2, "Wood");
+		pushInt(t, ItemType.Leaves); fielda(t, -2, "Leaves");
+		pushInt(t, ItemType.Sponge); fielda(t, -2, "Sponge");
+		pushInt(t, ItemType.Glass); fielda(t, -2, "Glass");
+		pushInt(t, ItemType.LapisLazuliOre); fielda(t, -2, "LapisLazuliOre");
+		pushInt(t, ItemType.LapisLazuliBlock); fielda(t, -2, "LapisLazuliBlock");
+		pushInt(t, ItemType.Dispenser); fielda(t, -2, "Dispenser");
+		pushInt(t, ItemType.Sandstone); fielda(t, -2, "Sandstone");
+		pushInt(t, ItemType.NoteBlock); fielda(t, -2, "NoteBlock");
+		pushInt(t, ItemType.Bed_placed); fielda(t, -2, "Bed_placed");
+		pushInt(t, ItemType.PoweredRail); fielda(t, -2, "PoweredRail");
+		pushInt(t, ItemType.DetectorRail); fielda(t, -2, "DetectorRail");
+		pushInt(t, ItemType.StickyPiston); fielda(t, -2, "StickyPiston");
+		pushInt(t, ItemType.Cobweb); fielda(t, -2, "Cobweb");
+		pushInt(t, ItemType.TallGrass); fielda(t, -2, "TallGrass");
+		pushInt(t, ItemType.DeadShrub); fielda(t, -2, "DeadShrub");
+		pushInt(t, ItemType.Piston); fielda(t, -2, "Piston");
+		pushInt(t, ItemType.PistonHead); fielda(t, -2, "PistonHead");
+		pushInt(t, ItemType.Wool); fielda(t, -2, "Wool");
+		pushInt(t, ItemType.Block36); fielda(t, -2, "Block36");
+		pushInt(t, ItemType.YellowFlower); fielda(t, -2, "YellowFlower");
+		pushInt(t, ItemType.RedRose); fielda(t, -2, "RedRose");
+		pushInt(t, ItemType.BrownMushroom); fielda(t, -2, "BrownMushroom");
+		pushInt(t, ItemType.RedMushroom); fielda(t, -2, "RedMushroom");
+		pushInt(t, ItemType.GoldBlock); fielda(t, -2, "GoldBlock");
+		pushInt(t, ItemType.IronBlock); fielda(t, -2, "IronBlock");
+		pushInt(t, ItemType.DoubleSlab); fielda(t, -2, "DoubleSlab");
+		pushInt(t, ItemType.Slab); fielda(t, -2, "Slab");
+		pushInt(t, ItemType.Brick); fielda(t, -2, "Brick");
+		pushInt(t, ItemType.Tnt); fielda(t, -2, "Tnt");
+		pushInt(t, ItemType.Bookshelf); fielda(t, -2, "Bookshelf");
+		pushInt(t, ItemType.MossStone); fielda(t, -2, "MossStone");
+		pushInt(t, ItemType.Obsidian); fielda(t, -2, "Obsidian");
+		pushInt(t, ItemType.Torch); fielda(t, -2, "Torch");
+		pushInt(t, ItemType.Fire); fielda(t, -2, "Fire");
+		pushInt(t, ItemType.MonsterSpawner); fielda(t, -2, "MonsterSpawner");
+		pushInt(t, ItemType.WoodenStairs); fielda(t, -2, "WoodenStairs");
+		pushInt(t, ItemType.Chest); fielda(t, -2, "Chest");
+		pushInt(t, ItemType.RedstoneWire_placed); fielda(t, -2, "RedstoneWire_placed");
+		pushInt(t, ItemType.DiamondOre); fielda(t, -2, "DiamondOre");
+		pushInt(t, ItemType.DiamondBlock); fielda(t, -2, "DiamondBlock");
+		pushInt(t, ItemType.CraftingTable); fielda(t, -2, "CraftingTable");
+		pushInt(t, ItemType.Crops); fielda(t, -2, "Crops");
+		pushInt(t, ItemType.Farmland); fielda(t, -2, "Farmland");
+		pushInt(t, ItemType.Furnace); fielda(t, -2, "Furnace");
+		pushInt(t, ItemType.BurningFurnace); fielda(t, -2, "BurningFurnace");
+		pushInt(t, ItemType.SignPost_placed); fielda(t, -2, "SignPost_placed");
+		pushInt(t, ItemType.WoodenDoor_placed); fielda(t, -2, "WoodenDoor_placed");
+		pushInt(t, ItemType.Ladder); fielda(t, -2, "Ladder");
+		pushInt(t, ItemType.MinecartTracks); fielda(t, -2, "MinecartTracks");
+		pushInt(t, ItemType.CobblestoneStairs); fielda(t, -2, "CobblestoneStairs");
+		pushInt(t, ItemType.WallSign_placed); fielda(t, -2, "WallSign_placed");
+		pushInt(t, ItemType.Lever); fielda(t, -2, "Lever");
+		pushInt(t, ItemType.StonePressurePlate); fielda(t, -2, "StonePressurePlate");
+		pushInt(t, ItemType.IronDoor_placed); fielda(t, -2, "IronDoor_placed");
+		pushInt(t, ItemType.WoodenPressurePlate); fielda(t, -2, "WoodenPressurePlate");
+		pushInt(t, ItemType.RedstoneOre); fielda(t, -2, "RedstoneOre");
+		pushInt(t, ItemType.GlowingRedstoneOre); fielda(t, -2, "GlowingRedstoneOre");
+		pushInt(t, ItemType.RedstoneTorchOff_placed); fielda(t, -2, "RedstoneTorchOff_placed");
+		pushInt(t, ItemType.RedstoneTorchOn); fielda(t, -2, "RedstoneTorchOn");
+		pushInt(t, ItemType.StoneButton); fielda(t, -2, "StoneButton");
+		pushInt(t, ItemType.Snow); fielda(t, -2, "Snow");
+		pushInt(t, ItemType.Ice); fielda(t, -2, "Ice");
+		pushInt(t, ItemType.SnowBlock); fielda(t, -2, "SnowBlock");
+		pushInt(t, ItemType.Cactus); fielda(t, -2, "Cactus");
+		pushInt(t, ItemType.Clay); fielda(t, -2, "Clay");
+		pushInt(t, ItemType.SugarCane_placed); fielda(t, -2, "SugarCane_placed");
+		pushInt(t, ItemType.Jukebox); fielda(t, -2, "Jukebox");
+		pushInt(t, ItemType.Fence); fielda(t, -2, "Fence");
+		pushInt(t, ItemType.Pumpkin); fielda(t, -2, "Pumpkin");
+		pushInt(t, ItemType.Netherrack); fielda(t, -2, "Netherrack");
+		pushInt(t, ItemType.SoulSand); fielda(t, -2, "SoulSand");
+		pushInt(t, ItemType.Glowstone); fielda(t, -2, "Glowstone");
+		pushInt(t, ItemType.Portal); fielda(t, -2, "Portal");
+		pushInt(t, ItemType.JackOLantern); fielda(t, -2, "JackOLantern");
+		pushInt(t, ItemType.Cake_placed); fielda(t, -2, "Cake_placed");
+		pushInt(t, ItemType.RedstoneRepeaterOff_placed); fielda(t, -2, "RedstoneRepeaterOff_placed");
+		pushInt(t, ItemType.RedstoneRepeaterOn_placed); fielda(t, -2, "RedstoneRepeaterOn_placed");
+		pushInt(t, ItemType.LockedChest); fielda(t, -2, "LockedChest");
+		pushInt(t, ItemType.Trapdoor); fielda(t, -2, "Trapdoor");
+		pushInt(t, ItemType.HiddenSilverfish); fielda(t, -2, "HiddenSilverfish");
+		pushInt(t, ItemType.StoneBricks); fielda(t, -2, "StoneBricks");
+		pushInt(t, ItemType.HugeBrownMushroom); fielda(t, -2, "HugeBrownMushroom");
+		pushInt(t, ItemType.HugeRedMushroom); fielda(t, -2, "HugeRedMushroom");
+		pushInt(t, ItemType.IronBars); fielda(t, -2, "IronBars");
+		pushInt(t, ItemType.GlassPane); fielda(t, -2, "GlassPane");
+		pushInt(t, ItemType.Melon); fielda(t, -2, "Melon");
+		pushInt(t, ItemType.PumpkinStem); fielda(t, -2, "PumpkinStem");
+		pushInt(t, ItemType.MelonStem); fielda(t, -2, "MelonStem");
+		pushInt(t, ItemType.Vines); fielda(t, -2, "Vines");
+		pushInt(t, ItemType.FenceGate); fielda(t, -2, "FenceGate");
+		pushInt(t, ItemType.BrickStairs); fielda(t, -2, "BrickStairs");
+		pushInt(t, ItemType.StoneBrickStairs); fielda(t, -2, "StoneBrickStairs");
+		pushInt(t, ItemType.Mycelium); fielda(t, -2, "Mycelium");
+		pushInt(t, ItemType.LilyPad); fielda(t, -2, "LilyPad");
+		pushInt(t, ItemType.NetherBrick); fielda(t, -2, "NetherBrick");
+		pushInt(t, ItemType.NetherBrickFence); fielda(t, -2, "NetherBrickFence");
+		pushInt(t, ItemType.NetherBrickStairs); fielda(t, -2, "NetherBrickStairs");
+		pushInt(t, ItemType.NetherWart_placed); fielda(t, -2, "NetherWart_placed");
+		pushInt(t, ItemType.EnchantmentTable_placed); fielda(t, -2, "EnchantmentTable_placed");
+		pushInt(t, ItemType.BrewingStand_placed); fielda(t, -2, "BrewingStand_placed");
+		pushInt(t, ItemType.Cauldron_placed); fielda(t, -2, "Cauldron_placed");
+		pushInt(t, ItemType.EndPortal); fielda(t, -2, "EndPortal");
+		pushInt(t, ItemType.EndPortalFrame); fielda(t, -2, "EndPortalFrame");
+		pushInt(t, ItemType.EndStone); fielda(t, -2, "EndStone");
+		pushInt(t, ItemType.IronShovel); fielda(t, -2, "IronShovel");
+		pushInt(t, ItemType.IronPickaxe); fielda(t, -2, "IronPickaxe");
+		pushInt(t, ItemType.IronAxe); fielda(t, -2, "IronAxe");
+		pushInt(t, ItemType.FlintAndSteel); fielda(t, -2, "FlintAndSteel");
+		pushInt(t, ItemType.Apple); fielda(t, -2, "Apple");
+		pushInt(t, ItemType.Bow); fielda(t, -2, "Bow");
+		pushInt(t, ItemType.Arrow); fielda(t, -2, "Arrow");
+		pushInt(t, ItemType.Coal); fielda(t, -2, "Coal");
+		pushInt(t, ItemType.Diamond); fielda(t, -2, "Diamond");
+		pushInt(t, ItemType.IronIngot); fielda(t, -2, "IronIngot");
+		pushInt(t, ItemType.GoldIngot); fielda(t, -2, "GoldIngot");
+		pushInt(t, ItemType.IronSword); fielda(t, -2, "IronSword");
+		pushInt(t, ItemType.WoodenSword); fielda(t, -2, "WoodenSword");
+		pushInt(t, ItemType.WoodenShovel); fielda(t, -2, "WoodenShovel");
+		pushInt(t, ItemType.WoodenPickaxe); fielda(t, -2, "WoodenPickaxe");
+		pushInt(t, ItemType.WoodenAxe); fielda(t, -2, "WoodenAxe");
+		pushInt(t, ItemType.StoneSword); fielda(t, -2, "StoneSword");
+		pushInt(t, ItemType.StoneShovel); fielda(t, -2, "StoneShovel");
+		pushInt(t, ItemType.StonePickaxe); fielda(t, -2, "StonePickaxe");
+		pushInt(t, ItemType.StoneAxe); fielda(t, -2, "StoneAxe");
+		pushInt(t, ItemType.DiamondSword); fielda(t, -2, "DiamondSword");
+		pushInt(t, ItemType.DiamondShovel); fielda(t, -2, "DiamondShovel");
+		pushInt(t, ItemType.DiamondPickaxe); fielda(t, -2, "DiamondPickaxe");
+		pushInt(t, ItemType.DiamondAxe); fielda(t, -2, "DiamondAxe");
+		pushInt(t, ItemType.Stick); fielda(t, -2, "Stick");
+		pushInt(t, ItemType.Bowl); fielda(t, -2, "Bowl");
+		pushInt(t, ItemType.MushroomStew); fielda(t, -2, "MushroomStew");
+		pushInt(t, ItemType.GoldSword); fielda(t, -2, "GoldSword");
+		pushInt(t, ItemType.GoldShovel); fielda(t, -2, "GoldShovel");
+		pushInt(t, ItemType.GoldPickaxe); fielda(t, -2, "GoldPickaxe");
+		pushInt(t, ItemType.GoldAxe); fielda(t, -2, "GoldAxe");
+		pushInt(t, ItemType.String); fielda(t, -2, "String");
+		pushInt(t, ItemType.Feather); fielda(t, -2, "Feather");
+		pushInt(t, ItemType.Gunpowder); fielda(t, -2, "Gunpowder");
+		pushInt(t, ItemType.WoodenHoe); fielda(t, -2, "WoodenHoe");
+		pushInt(t, ItemType.StoneHoe); fielda(t, -2, "StoneHoe");
+		pushInt(t, ItemType.IronHoe); fielda(t, -2, "IronHoe");
+		pushInt(t, ItemType.DiamondHoe); fielda(t, -2, "DiamondHoe");
+		pushInt(t, ItemType.GoldHoe); fielda(t, -2, "GoldHoe");
+		pushInt(t, ItemType.Seeds); fielda(t, -2, "Seeds");
+		pushInt(t, ItemType.Wheat); fielda(t, -2, "Wheat");
+		pushInt(t, ItemType.Bread); fielda(t, -2, "Bread");
+		pushInt(t, ItemType.LeatherHelmet); fielda(t, -2, "LeatherHelmet");
+		pushInt(t, ItemType.LeatherChestplate); fielda(t, -2, "LeatherChestplate");
+		pushInt(t, ItemType.LeatherLeggings); fielda(t, -2, "LeatherLeggings");
+		pushInt(t, ItemType.LeatherBoots); fielda(t, -2, "LeatherBoots");
+		pushInt(t, ItemType.ChainmailHelmet); fielda(t, -2, "ChainmailHelmet");
+		pushInt(t, ItemType.ChainmailChestplate); fielda(t, -2, "ChainmailChestplate");
+		pushInt(t, ItemType.ChainmailLeggings); fielda(t, -2, "ChainmailLeggings");
+		pushInt(t, ItemType.ChainmailBoots); fielda(t, -2, "ChainmailBoots");
+		pushInt(t, ItemType.IronHelmet); fielda(t, -2, "IronHelmet");
+		pushInt(t, ItemType.IronChestplate); fielda(t, -2, "IronChestplate");
+		pushInt(t, ItemType.IronLeggings); fielda(t, -2, "IronLeggings");
+		pushInt(t, ItemType.IronBoots); fielda(t, -2, "IronBoots");
+		pushInt(t, ItemType.DiamondHelmet); fielda(t, -2, "DiamondHelmet");
+		pushInt(t, ItemType.DiamondChestplate); fielda(t, -2, "DiamondChestplate");
+		pushInt(t, ItemType.DiamondLeggings); fielda(t, -2, "DiamondLeggings");
+		pushInt(t, ItemType.DiamondBoots); fielda(t, -2, "DiamondBoots");
+		pushInt(t, ItemType.GoldHelmet); fielda(t, -2, "GoldHelmet");
+		pushInt(t, ItemType.GoldChestplate); fielda(t, -2, "GoldChestplate");
+		pushInt(t, ItemType.GoldLeggings); fielda(t, -2, "GoldLeggings");
+		pushInt(t, ItemType.GoldBoots); fielda(t, -2, "GoldBoots");
+		pushInt(t, ItemType.Flint); fielda(t, -2, "Flint");
+		pushInt(t, ItemType.RawPorkchop); fielda(t, -2, "RawPorkchop");
+		pushInt(t, ItemType.CookedPorkchop); fielda(t, -2, "CookedPorkchop");
+		pushInt(t, ItemType.Painting); fielda(t, -2, "Painting");
+		pushInt(t, ItemType.GoldenApple); fielda(t, -2, "GoldenApple");
+		pushInt(t, ItemType.Sign); fielda(t, -2, "Sign");
+		pushInt(t, ItemType.WoodenDoor); fielda(t, -2, "WoodenDoor");
+		pushInt(t, ItemType.Bucket); fielda(t, -2, "Bucket");
+		pushInt(t, ItemType.WaterBucket); fielda(t, -2, "WaterBucket");
+		pushInt(t, ItemType.LavaBucket); fielda(t, -2, "LavaBucket");
+		pushInt(t, ItemType.Minecart); fielda(t, -2, "Minecart");
+		pushInt(t, ItemType.Saddle); fielda(t, -2, "Saddle");
+		pushInt(t, ItemType.IronDoor); fielda(t, -2, "IronDoor");
+		pushInt(t, ItemType.Redstone); fielda(t, -2, "Redstone");
+		pushInt(t, ItemType.Snowball); fielda(t, -2, "Snowball");
+		pushInt(t, ItemType.Boat); fielda(t, -2, "Boat");
+		pushInt(t, ItemType.Leather); fielda(t, -2, "Leather");
+		pushInt(t, ItemType.MilkBucket); fielda(t, -2, "MilkBucket");
+		pushInt(t, ItemType.ClayBrick); fielda(t, -2, "ClayBrick");
+		pushInt(t, ItemType.ClayBall); fielda(t, -2, "ClayBall");
+		pushInt(t, ItemType.SugarCane); fielda(t, -2, "SugarCane");
+		pushInt(t, ItemType.Paper); fielda(t, -2, "Paper");
+		pushInt(t, ItemType.Book); fielda(t, -2, "Book");
+		pushInt(t, ItemType.Slimeball); fielda(t, -2, "Slimeball");
+		pushInt(t, ItemType.StorageMinecart); fielda(t, -2, "StorageMinecart");
+		pushInt(t, ItemType.PoweredMinecart); fielda(t, -2, "PoweredMinecart");
+		pushInt(t, ItemType.Egg); fielda(t, -2, "Egg");
+		pushInt(t, ItemType.Compass); fielda(t, -2, "Compass");
+		pushInt(t, ItemType.FishingRod); fielda(t, -2, "FishingRod");
+		pushInt(t, ItemType.Clock); fielda(t, -2, "Clock");
+		pushInt(t, ItemType.GlowstoneDust); fielda(t, -2, "GlowstoneDust");
+		pushInt(t, ItemType.RawFish); fielda(t, -2, "RawFish");
+		pushInt(t, ItemType.CookedFish); fielda(t, -2, "CookedFish");
+		pushInt(t, ItemType.InkSac); fielda(t, -2, "InkSac");
+		pushInt(t, ItemType.Bone); fielda(t, -2, "Bone");
+		pushInt(t, ItemType.Sugar); fielda(t, -2, "Sugar");
+		pushInt(t, ItemType.Cake); fielda(t, -2, "Cake");
+		pushInt(t, ItemType.Bed); fielda(t, -2, "Bed");
+		pushInt(t, ItemType.RedstoneRepeater); fielda(t, -2, "RedstoneRepeater");
+		pushInt(t, ItemType.Cookie); fielda(t, -2, "Cookie");
+		pushInt(t, ItemType.Map); fielda(t, -2, "Map");
+		pushInt(t, ItemType.Shears); fielda(t, -2, "Shears");
+		pushInt(t, ItemType.MelonSlice); fielda(t, -2, "MelonSlice");
+		pushInt(t, ItemType.PumpkinSeeds); fielda(t, -2, "PumpkinSeeds");
+		pushInt(t, ItemType.MelonSeeds); fielda(t, -2, "MelonSeeds");
+		pushInt(t, ItemType.RawBeef); fielda(t, -2, "RawBeef");
+		pushInt(t, ItemType.Steak); fielda(t, -2, "Steak");
+		pushInt(t, ItemType.RawChicken); fielda(t, -2, "RawChicken");
+		pushInt(t, ItemType.CookedChicken); fielda(t, -2, "CookedChicken");
+		pushInt(t, ItemType.RottenFlesh); fielda(t, -2, "RottenFlesh");
+		pushInt(t, ItemType.EnderPearl); fielda(t, -2, "EnderPearl");
+		pushInt(t, ItemType.BlazeRod); fielda(t, -2, "BlazeRod");
+		pushInt(t, ItemType.GhastTear); fielda(t, -2, "GhastTear");
+		pushInt(t, ItemType.GoldNugget); fielda(t, -2, "GoldNugget");
+		pushInt(t, ItemType.NetherWart); fielda(t, -2, "NetherWart");
+		pushInt(t, ItemType.Potions); fielda(t, -2, "Potions");
+		pushInt(t, ItemType.GlassBottle); fielda(t, -2, "GlassBottle");
+		pushInt(t, ItemType.SpiderEye); fielda(t, -2, "SpiderEye");
+		pushInt(t, ItemType.FermentedSpiderEye); fielda(t, -2, "FermentedSpiderEye");
+		pushInt(t, ItemType.BlazePowder); fielda(t, -2, "BlazePowder");
+		pushInt(t, ItemType.MagmaCream); fielda(t, -2, "MagmaCream");
+		pushInt(t, ItemType.BrewingStand); fielda(t, -2, "BrewingStand");
+		pushInt(t, ItemType.Cauldron); fielda(t, -2, "Cauldron");
+		pushInt(t, ItemType.EyeOfEnder); fielda(t, -2, "EyeOfEnder");
+		pushInt(t, ItemType.GlisteringMelon); fielda(t, -2, "GlisteringMelon");
+		pushInt(t, ItemType.Disc_13); fielda(t, -2, "Disc_13");
+		pushInt(t, ItemType.CatDisc); fielda(t, -2, "CatDisc");
+		pushInt(t, ItemType.BlocksDisc); fielda(t, -2, "BlocksDisc");
+		pushInt(t, ItemType.ChirpDisc); fielda(t, -2, "ChirpDisc");
+		pushInt(t, ItemType.FarDisc); fielda(t, -2, "FarDisc");
+		pushInt(t, ItemType.MallDisc); fielda(t, -2, "MallDisc");
+		pushInt(t, ItemType.MellohiDisc); fielda(t, -2, "MellohiDisc");
+		pushInt(t, ItemType.StalDisc); fielda(t, -2, "StalDisc");
+		pushInt(t, ItemType.StradDisc); fielda(t, -2, "StradDisc");
+		pushInt(t, ItemType.WardDisc); fielda(t, -2, "WardDisc");
+		pushInt(t, ItemType.Disc_11); fielda(t, -2, "Disc_11");
+		
+		newGlobal(t, "ItemType");
 	}
 }
 
@@ -9731,10 +10004,10 @@ struct PreChunkObj
 			default:
 				throwStdException(t, `FieldException`, `Attempting to access nonexistent field '{}' from type PreChunk`, fieldName);
 			
-			case "y":
+			case "z":
 				dup(t, 0);
 				pushNull(t);
-				methodCall(t, -2, `_prop_y`, 1);
+				methodCall(t, -2, `_prop_z`, 1);
 				break;
 			
 			case "packetID":
@@ -9772,11 +10045,11 @@ struct PreChunkObj
 			default:
 				throwStdException(t, `FieldException`, `Attempting to access nonexistent field '{}' from type PreChunk`, fieldName);
 			
-			case "y":
+			case "z":
 				dup(t, 0);
 				pushNull(t);
 				dup(t, 2);
-				methodCall(t, -3, `_prop_y`, 0);
+				methodCall(t, -3, `_prop_z`, 0);
 				break;
 			
 			case "packetID":
@@ -9810,16 +10083,16 @@ struct PreChunkObj
 		return 0;
 	}
 	
-	uword _prop_y(CrocThread* t)
+	uword _prop_z(CrocThread* t)
 	{
 		auto numParams = stackSize(t) - 1;
 		PreChunk inst = getThis(t);
 		if(numParams == 0)
 		{
-			superPush(t, inst.y);
+			superPush(t, inst.z);
 			return 1;
 		}
-		throwStdException(t, "FieldException", "Attempting to set read-only property 'y' of type 'int'");
+		throwStdException(t, "FieldException", "Attempting to set read-only property 'z' of type 'int'");
 	}
 	
 	uword _prop_packetID(CrocThread* t)
@@ -9880,7 +10153,7 @@ struct PreChunkObj
 			c.method("receive", &receive);
 			
 			//properties
-			c.method("_prop_y", &_prop_y);
+			c.method("_prop_z", &_prop_z);
 			c.method("_prop_packetID", &_prop_packetID);
 			c.method("_prop_mode", &_prop_mode);
 			c.method("_prop_x", &_prop_x);
@@ -11585,6 +11858,12 @@ struct NewStateObj
 				methodCall(t, -2, `_prop_reason`, 1);
 				break;
 			
+			case "mode":
+				dup(t, 0);
+				pushNull(t);
+				methodCall(t, -2, `_prop_mode`, 1);
+				break;
+			
 			case "minSize":
 				dup(t, 0);
 				pushNull(t);
@@ -11615,6 +11894,13 @@ struct NewStateObj
 				methodCall(t, -3, `_prop_reason`, 0);
 				break;
 			
+			case "mode":
+				dup(t, 0);
+				pushNull(t);
+				dup(t, 2);
+				methodCall(t, -3, `_prop_mode`, 0);
+				break;
+			
 			case "minSize":
 				dup(t, 0);
 				pushNull(t);
@@ -11642,6 +11928,18 @@ struct NewStateObj
 			return 1;
 		}
 		throwStdException(t, "FieldException", "Attempting to set read-only property 'reason' of type 'byte'");
+	}
+	
+	uword _prop_mode(CrocThread* t)
+	{
+		auto numParams = stackSize(t) - 1;
+		NewState inst = getThis(t);
+		if(numParams == 0)
+		{
+			superPush(t, inst.mode);
+			return 1;
+		}
+		throwStdException(t, "FieldException", "Attempting to set read-only property 'mode' of type 'byte'");
 	}
 	
 	uword _prop_minSize(CrocThread* t)
@@ -11679,6 +11977,7 @@ struct NewStateObj
 			
 			//properties
 			c.method("_prop_reason", &_prop_reason);
+			c.method("_prop_mode", &_prop_mode);
 			c.method("_prop_minSize", &_prop_minSize);
 			c.method("_prop_packetID", &_prop_packetID);
 			c.method("opField", &opField);
